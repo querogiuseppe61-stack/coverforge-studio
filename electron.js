@@ -60,6 +60,7 @@ function openServerLog() {
 
 function startServer() {
   serverExit = null;
+  try { fs.mkdirSync(BASE_DIR, { recursive: true }); } catch { /* se non si può creare, lo dirà lo spawn */ }
   const nodeBin = PACKAGED ? process.execPath : (process.env.npm_node_execpath || 'node');
   const log = openServerLog();
   const env = { ...process.env, PORT: String(PORT) };
