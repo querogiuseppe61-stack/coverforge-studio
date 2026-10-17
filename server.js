@@ -584,8 +584,12 @@ async function resolveReferenceImage(url) {
   throw new Error('Riferimento immagine non consentito.');
 }
 
+/* Formati che OpenRouter accetta in image_config.aspect_ratio. Gli altri (es. 1.91:1, 3:1) restano solo nel prompt. */
+const ASPECT_RATIOS = ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'];
+
 app.post('/api/generate', async (req, res) => {
   const { model, prompt, referenceImages = [] } = req.body;
+  const aspect = ASPECT_RATIOS.includes(req.body.aspectRatio) ? req.body.aspectRatio : null;
   const key = req.headers['x-or-key'] || req.body.key;
   let resolved;
   try {
@@ -598,14 +602,23 @@ app.post('/api/generate', async (req, res) => {
   ];
   try {
     // la generazione costa: un solo nuovo tentativo, e solo su 429 o errore di rete (mai su 5xx o timeout)
-    const j = await openrouter(res, '/chat/completions', {
+    const call = (withAspect) => openrouter(res, '/chat/completions', {
       key, timeout: 180000, retries: 1, retry5xx: false,
-      body: { model, messages: [{ role: 'user', content }], modalities: ['image', 'text'] }
+      body: { model, messages: [{ role: 'user', content }], modalities: ['image', 'text'],
+        ...(withAspect ? { image_config: { aspect_ratio: aspect } } : {}) }
     });
+    // un modello che rifiuta image_config risponde 400 senza generare (quindi senza costo): si riprova senza
+    let j, aspectRejected = false;
+    try { j = await call(Boolean(aspect)); }
+    catch (e) {
+      if (!(aspect && e instanceof UpstreamError && e.status === 400)) throw e;
+      aspectRejected = true;
+      j = await call(false);
+    }
     const msg = j.choices?.[0]?.message || {};
     const imgs = (msg.images || []).map(i => i.image_url?.url).filter(Boolean);
     if (!imgs.length) return res.status(422).json({ error: 'Il modello non ha restituito immagini.', text: msg.content });
-    res.json({ images: imgs, note: msg.content || '' });
+    res.json({ images: imgs, note: msg.content || '', aspect: aspectRejected ? 'rifiutato' : aspect ? 'inviato' : 'no' });
   } catch (e) { sendError(res, e); }
 });
 

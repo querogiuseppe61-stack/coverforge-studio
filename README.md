@@ -41,6 +41,14 @@ bash install-desktop.sh --menu   # in più lo aggiunge al menu delle applicazion
 
 Rilancialo se sposti la cartella del progetto.
 
+## Formato dell'immagine
+
+Il formato scelto viene sempre scritto nel prompt. Con **Chiedi il formato al modello grafico** (nelle impostazioni, attiva di default) l'app lo chiede anche con il parametro di OpenRouter `image_config.aspect_ratio`, che i modelli grafici rispettano meglio del testo. Il parametro accetta 1:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9 e 21:9; gli altri formati (1.91:1, 3:1, 4:1) restano solo nel prompt, e il registro lo dice la prima volta.
+
+- In *Rifinisci* si chiede il formato dell'immagine di partenza, se è tra quelli ammessi, così la modifica non cambia le proporzioni.
+- In *Allarga al formato* si chiede il formato di arrivo.
+- Se un modello rifiuta il parametro (errore 400, senza costo), l'app rigenera subito senza e lo segnala una volta nel registro.
+
 ## Riferimenti e guida per il prompt
 
 - **File di testo** (txt, md, PDF, DOCX): spunta quelli da usare. Il testo va al modello che scrive il prompt, che ne ricava personaggi, ambientazione, atmosfera e simboli. Per ogni file si usano al più i caratteri scelti in *Testo da usare per ogni file* (da circa 1 a 16 pagine); se il file è più lungo si prendono **inizio, metà e fine**, non solo l'apertura. In totale non si superano 60.000 caratteri per richiesta. Nel registro compare cosa è stato usato.
