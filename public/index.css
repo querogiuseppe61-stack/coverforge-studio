@@ -1089,7 +1089,11 @@ button:focus-visible {
 .compare-before {
   position: absolute;
   inset: 0;
-  background-size: 100% 100%;
+  /* contain: se il formato è cambiato, l'originale compare intero al centro della nuova immagine */
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-color: rgba(5, 8, 15, 0.85);
   border-radius: inherit;
 }
 .compare-line {
@@ -1113,6 +1117,24 @@ button:focus-visible {
 .compare-tag.before { left: 8px; }
 .compare-tag.after { right: 8px; }
 #quickEdit { width: auto; max-width: 220px; }
+
+/* ── Zona da modificare: tratti rossi semitrasparenti sopra l'immagine ── */
+.zone-canvas {
+  position: absolute;
+  z-index: 11;
+  opacity: 0.5;
+  pointer-events: none;
+  border-radius: var(--radius-sm);
+}
+.zone-canvas.drawing {
+  z-index: 13;
+  pointer-events: auto;
+  cursor: crosshair;
+  touch-action: none;
+  outline: 2px dashed rgba(255, 80, 80, 0.8);
+}
+.inline-range { display: flex; align-items: center; gap: 8px; font-size: 12px; margin: 0; }
+.inline-range input { width: 110px; }
 
 /* ── Il mio stile ── */
 .style-status {
