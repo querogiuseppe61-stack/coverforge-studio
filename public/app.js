@@ -309,9 +309,12 @@ async function loadRefFiles(){
         <label class="ref-toggle" title="Includi come riferimento">
           <input type="checkbox" aria-label="Usa come riferimento: ${escapeHtml(row.original_name)}" data-id="${row.id}" data-type="${row.file_type}" data-stored="${escapeHtml(row.stored_name)}" data-name="${escapeHtml(row.original_name)}">
         </label>
+        ${row.file_type === 'image' ? `<button class="ref-open" title="Apri nel riquadro del risultato: da lì puoi rifinirla, comporre il testo o esportarla" aria-label="Apri ${escapeHtml(row.original_name)}">✎</button>` : ''}
         ${row.file_type === 'image' ? `<button class="ref-style${row.style_example ? ' on' : ''}" aria-pressed="${row.style_example ? 'true' : 'false'}" title="Esempio del mio stile: entra nell'archivio da cui si ricava il profilo" aria-label="Esempio di stile: ${escapeHtml(row.original_name)}">🎨</button>` : ''}
         <button class="ref-del" data-id="${row.id}" title="Rimuovi" aria-label="Rimuovi ${escapeHtml(row.original_name)}">✕</button>
       `;
+      const op = d.querySelector('.ref-open');
+      if (op) op.onclick = () => openOnStage(`/uploads/${row.stored_name}`, row.original_name);
       const st = d.querySelector('.ref-style');
       if (st) st.onclick = () => toggleMark(st, `/api/ref-files/${row.id}/style`, 'style');
       d.querySelector('.ref-del').onclick = async () => {
@@ -921,6 +924,19 @@ $('#btnStyleBuild').onclick = async () => {
   } catch (e) { log('Profilo di stile: ' + e.message); }
   busy(false); btn.disabled = false;
 };
+
+/* Un'immagine non generata qui (allegato o file dal computer) nel riquadro del risultato:
+   si può rifinire, comporre con la mascherina, esportare. Non entra in cronologia finché non la rifinisci. */
+function openOnStage(url, name){
+  const meta = { prompt: '' };
+  renderImage(url, meta);
+  addToGallery(url, meta);
+  $('#stage').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  log(`Aperta: ${name}. Puoi rifinirla, aggiungere testo con la mascherina o esportarla.`);
+}
+
+$('#btnOpenImg').onclick = () => $('#openImgInput').click();
+$('#openImgInput').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) maskUseOwnImage(f); };
 
 /* ── Utility ── */
 /* Una nuova immagine generata: mostra, aggiungi alla galleria, salva in cronologia */

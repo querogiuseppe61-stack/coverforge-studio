@@ -883,7 +883,7 @@ function maskUseOwnImage(file) {
   if (!MASK_IMAGE_TYPES.includes(file.type)) return log('Formato non supportato (PNG, JPEG, WebP, GIF, BMP).');
   if (file.size > 25 * 1024 * 1024) return log('Immagine troppo grande (max 25 MB).');
   const fr = new FileReader();
-  fr.onload = () => { renderImage(fr.result, { prompt: '' }); addToGallery(fr.result, { prompt: '' }); log(`Base: ${file.name}`); };
+  fr.onload = () => openOnStage(fr.result, file.name);
   fr.onerror = () => log('Impossibile leggere il file.');
   fr.readAsDataURL(file);
 }
