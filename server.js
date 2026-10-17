@@ -48,6 +48,7 @@ app.use((req, res, next) => {
 /* Solo le rotte che ricevono immagini in base64 accettano corpi grandi */
 app.use(['/api/generate', '/api/history'], express.json({ limit: '30mb' }));
 app.use('/api/craft', express.json({ limit: '8mb' }));   // testo + fino a 3 immagini ridotte
+app.use('/api/style-profile/build', express.json({ limit: '20mb' }));   // fino a 16 immagini ridotte
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -88,6 +89,16 @@ db.exec(`
     ts INTEGER NOT NULL
   );
 `);
+
+/* Profilo di stile: immagini preferite della cronologia (⭐) e immagini allegate segnate come esempi di stile (🎨) */
+const addColumn = (table, col, def) => {
+  if (!db.prepare(`PRAGMA table_info(${table})`).all().some(c => c.name === col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
+};
+addColumn('history', 'favorite', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('reference_files', 'style_example', 'INTEGER NOT NULL DEFAULT 0');
+db.exec('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
+const getSetting = (k) => { const r = db.prepare('SELECT value FROM settings WHERE key=?').get(k); try { return r ? JSON.parse(r.value) : null; } catch { return null; } };
+const setSetting = (k, v) => db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(k, JSON.stringify(v));
 
 /* ── File upload ── */
 const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
@@ -189,7 +200,7 @@ async function sniffFile(filePath, ext) {
 
 /* ── API: Reference files ── */
 app.get('/api/ref-files', (_req, res) => {
-  const rows = db.prepare('SELECT id, original_name, stored_name, file_type, mime_type, size, ts FROM reference_files ORDER BY ts DESC').all();
+  const rows = db.prepare('SELECT id, original_name, stored_name, file_type, mime_type, size, ts, style_example FROM reference_files ORDER BY ts DESC').all();
   res.json(rows);
 });
 
@@ -658,7 +669,7 @@ function pruneHistory() {
 
 /* Elenco leggero: niente immagini, solo l'URL da cui caricarle */
 app.get('/api/history', (_req, res) => {
-  const rows = db.prepare(`SELECT id, ts, category, ratio, style, title, subtitle, brief, prompt, text_model, image_model,
+  const rows = db.prepare(`SELECT id, ts, category, ratio, style, title, subtitle, brief, prompt, text_model, image_model, favorite,
       (image_file IS NOT NULL OR image IS NOT NULL) AS has_image
     FROM history ORDER BY ts DESC, id DESC LIMIT 200`).all();
   res.json(rows.map(({ has_image, ...r }) => ({ ...r, image_url: has_image ? `/api/history/${r.id}/image` : null })));
@@ -722,6 +733,93 @@ app.delete('/api/history', (_req, res) => {
   db.prepare('DELETE FROM history').run();
   rows.forEach(r => removeGeneratedFile(r.image_file));
   res.json({ ok: true });
+});
+
+/* ── Profilo di stile ──
+   L'archivio (⭐ cronologia + 🎨 allegati) si trasforma una volta sola, su richiesta, in una descrizione testuale
+   dello stile; a ogni prompt viaggia solo quel testo. Le immagini vanno a OpenRouter solo durante l'aggiornamento. */
+const STYLE_MAX_IMAGES = 16, STYLE_MIN_IMAGES = 3;
+
+app.post('/api/history/:id/favorite', (req, res) => {
+  const info = db.prepare('UPDATE history SET favorite=? WHERE id=?').run(req.body?.favorite ? 1 : 0, Number(req.params.id));
+  if (!info.changes) return res.status(404).json({ error: 'Immagine non trovata nella cronologia.' });
+  res.json({ ok: true });
+});
+
+app.post('/api/ref-files/:id/style', (req, res) => {
+  const info = db.prepare("UPDATE reference_files SET style_example=? WHERE id=? AND file_type='image'").run(req.body?.style ? 1 : 0, Number(req.params.id));
+  if (!info.changes) return res.status(404).json({ error: 'Immagine allegata non trovata.' });
+  res.json({ ok: true });
+});
+
+/* Immagini dell'archivio di stile, alternando esempi e preferite (le più recenti prima) fino al massimo */
+function styleSources() {
+  const examples = db.prepare("SELECT id, stored_name FROM reference_files WHERE style_example=1 AND file_type='image' ORDER BY ts DESC").all()
+    .map(r => ({ key: `r${r.id}`, url: `/uploads/${r.stored_name}`, kind: 'esempio' }));
+  const favorites = db.prepare('SELECT id FROM history WHERE favorite=1 AND (image_file IS NOT NULL OR image IS NOT NULL) ORDER BY ts DESC, id DESC').all()
+    .map(r => ({ key: `h${r.id}`, url: `/api/history/${r.id}/image`, kind: 'preferita' }));
+  const out = [];
+  for (let i = 0; out.length < STYLE_MAX_IMAGES && (i < examples.length || i < favorites.length); i++) {
+    if (examples[i]) out.push(examples[i]);
+    if (favorites[i] && out.length < STYLE_MAX_IMAGES) out.push(favorites[i]);
+  }
+  return { images: out, examples: examples.length, favorites: favorites.length };
+}
+
+app.get('/api/style-profile', (_req, res) => {
+  const p = getSetting('style_profile') || { text: '', ts: null, sources: [], auto: false };
+  res.json({ ...p, archive: styleSources() });
+});
+
+/* Modifica a mano del profilo */
+app.put('/api/style-profile', (req, res) => {
+  const text = clip(req.body?.text, 4000).trim();
+  const prev = getSetting('style_profile') || {};
+  setSetting('style_profile', { text, ts: Date.now(), sources: text ? prev.sources || [] : [], auto: false });
+  res.json({ ok: true });
+});
+
+const STYLE_SYSTEM = `Sei un art director. Ricevi alcune immagini scelte da una persona perché rappresentano il suo gusto grafico: alcune le ha create e salvate tra le preferite, altre le ha raccolte come esempi.
+Descrivi lo STILE che le accomuna, non i soggetti: chi legge deve poter orientare nuove immagini, su temi diversi, verso questo gusto.
+Scrivi in italiano, 120-250 parole, una riga per voce, in quest'ordine:
+Tecnica e medium: …
+Palette: …
+Luce: …
+Composizione: …
+Dettaglio e texture: …
+Atmosfera: …
+Ricorrenze: (scelte visive che tornano spesso)
+Poco presente: (ciò che manca o è raro, utile per non andare fuori gusto)
+Sii concreto e specifico (non "colori belli", ma "toni terrosi desaturati con un solo accento arancio"). Se le immagini sono molto diverse tra loro, descrivi ciò che hanno in comune e dichiara la varietà; non inventare tratti che non vedi.
+Rispondi solo con le righe del profilo, senza introduzioni né markdown.`;
+
+app.post('/api/style-profile/build', async (req, res) => {
+  const { model, images, sources } = req.body || {};
+  const key = req.headers['x-or-key'] || req.body?.key;
+  try {
+    if (typeof model !== 'string' || !model) throw new UpstreamError(400, 'Modello di testo mancante.');
+    if (!Array.isArray(images) || images.length < STYLE_MIN_IMAGES || images.length > STYLE_MAX_IMAGES) {
+      throw new UpstreamError(400, `Servono da ${STYLE_MIN_IMAGES} a ${STYLE_MAX_IMAGES} immagini.`);
+    }
+    for (const u of images) {
+      if (typeof u !== 'string' || u.length > 1500000 || !/^data:image\/(png|jpeg|webp);base64,/.test(u.slice(0, 30))) {
+        throw new UpstreamError(400, 'Immagine non valida per il profilo di stile.');
+      }
+    }
+    const j = await openrouter(res, '/chat/completions', {
+      key, timeout: 120000, retries: 2,
+      body: { model, temperature: 0.4, messages: [
+        { role: 'system', content: STYLE_SYSTEM },
+        { role: 'user', content: [{ type: 'text', text: `Ecco ${images.length} immagini. Descrivi il profilo di stile.` },
+          ...images.map(url => ({ type: 'image_url', image_url: { url } }))] }
+      ] }
+    });
+    const text = String(j.choices?.[0]?.message?.content || '').replace(/```\w*/g, '').trim().slice(0, 4000);
+    if (!text) throw new UpstreamError(502, 'Il modello non ha restituito un profilo.');
+    const keys = Array.isArray(sources) ? sources.filter(k => typeof k === 'string' && /^[hr]\d+$/.test(k)).slice(0, STYLE_MAX_IMAGES) : [];
+    setSetting('style_profile', { text, ts: Date.now(), sources: keys, auto: true, model });
+    res.json({ text });
+  } catch (e) { sendError(res, e); }
 });
 
 /* ── Start ── */

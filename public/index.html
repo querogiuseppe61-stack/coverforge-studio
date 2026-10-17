@@ -95,6 +95,16 @@
     <div class="ref-list" id="refList"></div>
     <div class="ref-empty" id="refEmpty">Nessun file allegato</div>
 
+    <h2>🖌️ Il mio stile</h2>
+    <label class="check" title="Il profilo qui sotto orienta il prompt verso il tuo gusto grafico. Il brief e lo stile artistico scelto hanno la precedenza."><input type="checkbox" id="useStyle"> Usa il mio stile nei prompt</label>
+    <p class="ref-hint">Segna con ⭐ le immagini della cronologia che ti piacciono e con 🎨 le immagini allegate che rappresentano il tuo gusto. Poi aggiorna il profilo: un modello con la vista (👁) ne ricava una descrizione dello stile, che puoi correggere a mano.</p>
+    <div id="styleStatus" class="style-status" role="status" aria-live="polite"></div>
+    <textarea id="styleProfile" rows="8" aria-label="Profilo di stile" placeholder="Ancora nessun profilo. Segna almeno 3 immagini e premi «Aggiorna profilo», oppure scrivilo tu."></textarea>
+    <div class="row">
+      <button id="btnStyleBuild" title="Analizza le immagini segnate con il modello LLM scelto (serve la vista 👁)">↻ Aggiorna profilo</button>
+      <button id="btnStyleSave" disabled>💾 Salva modifiche</button>
+    </div>
+
     <h2>📜 Cronologia</h2>
     <div class="row">
       <button id="btnHistReload">↻ Ricarica</button>
@@ -143,6 +153,7 @@
         <option value="webp">WebP</option>
       </select>
       <button id="btnDl" disabled>⬇ Scarica</button>
+      <button id="btnFav" disabled aria-pressed="false" title="Aggiungi alle preferite: entra nell'archivio del tuo stile">☆ Preferita</button>
       <select id="svgColors" aria-label="Numero di colori per l'SVG" title="Colori usati nella vettorializzazione">
         <option value="2">SVG 2 colori</option>
         <option value="4">SVG 4 colori</option>
