@@ -825,6 +825,70 @@ function updateCompareButtons(){
   setCompare(false);
 }
 
+/* ── Nuovo formato (outpainting) ──
+   L'immagine intera va al centro di una tela del formato di arrivo; lo spazio che manca è riempito con una
+   versione molto sfocata dell'immagine stessa (dà al modello colori e luce da continuare). Il modello allarga
+   la scena in quello spazio. Se il risultato non ha il formato esatto, si ritaglia al centro. */
+const parseRatio = (s) => { const [a, b] = String(s).split(':').map(Number); return a > 0 && b > 0 ? a / b : NaN; };
+const REFORMAT_MAX_SIDE = 2048;
+
+function paddedCanvas(img, r){
+  const w = img.naturalWidth, h = img.naturalHeight;
+  let W = r > w / h ? h * r : w, H = r > w / h ? h : w / r;
+  const k = Math.min(1, REFORMAT_MAX_SIDE / Math.max(W, H));
+  W = Math.round(W * k); H = Math.round(H * k);
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  // sfocatura senza ctx.filter: l'immagine «a copertura» rimpicciolita a pochi pixel e poi riallargata
+  const t = document.createElement('canvas'), ts = 24 / Math.max(W, H);
+  t.width = Math.max(1, Math.round(W * ts)); t.height = Math.max(1, Math.round(H * ts));
+  const cover = Math.max(t.width / w, t.height / h);
+  t.getContext('2d').drawImage(img, (t.width - w * cover) / 2, (t.height - h * cover) / 2, w * cover, h * cover);
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(t, 0, 0, W, H);
+  const dw = Math.round(w * k), dh = Math.round(h * k);
+  g.drawImage(img, Math.round((W - dw) / 2), Math.round((H - dh) / 2), dw, dh);
+  return c;
+}
+
+/* Ritaglio centrale al formato esatto, solo se il modello ha restituito proporzioni diverse */
+async function enforceRatio(url, r){
+  const img = await maskLoadImage(url);
+  const w = img.naturalWidth, h = img.naturalHeight;
+  if (Math.abs((w / h) / r - 1) <= 0.02) return { url, cropped: false };
+  const cw = w / h > r ? Math.round(h * r) : w, ch = w / h > r ? h : Math.round(w / r);
+  const c = document.createElement('canvas'); c.width = cw; c.height = ch;
+  c.getContext('2d').drawImage(img, (w - cw) / 2, (h - ch) / 2, cw, ch, 0, 0, cw, ch);
+  return { url: c.toDataURL('image/png'), cropped: true, from: `${w}×${h}` };
+}
+
+$('#btnReformat').onclick = async () => {
+  if (!lastImage) return;
+  const target = $('#reformatRatio').value, r = parseRatio(target);
+  const source = lastImage, sourceMeta = lastMeta;
+  busy(true);
+  try {
+    let img;
+    try { img = await maskLoadImage(source); }
+    catch { throw new Error('immagine non leggibile qui (forse è su un sito esterno): scaricala e riaprila con «Carica immagine»'); }
+    const src = img.naturalWidth / img.naturalHeight;
+    if (Math.abs(src / r - 1) <= 0.02) { log(`L'immagine è già in formato ${target}.`); busy(false); return; }
+    const wider = r > src;
+    const padded = paddedCanvas(img, r).toDataURL('image/jpeg', 0.92);
+    const prompt = `This picture is placed in the center of a ${wider ? 'wider' : 'taller'} ${target} canvas; the blurred areas on the ${wider ? 'left and right' : 'top and bottom'} are only placeholders. `
+      + `Extend the scene into those areas so the result is one seamless ${target} image: continue the environment, perspective, light, colors and texture naturally, with no visible seams. `
+      + `Keep the original central part exactly as it is: same subject, composition, faces and any text. Do not add new main subjects, borders, frames or text in the extended areas.`
+      + (sourceMeta?.prompt ? ` The scene was originally described as: ${sourceMeta.prompt}` : '');
+    log(`Allargo la scena al formato ${target} (${wider ? 'ai lati' : 'sopra e sotto'})…`);
+    const res = await orFetch('/api/generate', { model: $('#imageModel').value, prompt, referenceImages: [padded] });
+    const out = await enforceRatio(res.images[0], r).catch(() => ({ url: res.images[0], cropped: false }));
+    if (out.cropped) log(`Il modello ha restituito ${out.from}: ritaglio al centro per avere esattamente ${target}.`);
+    showImage(out.url, { prompt: sourceMeta?.prompt || '', edit: prompt, ratio: target, parent: { url: source, meta: sourceMeta } });
+    log(`Formato ${target} pronto ✔ · «⇆ Prima / dopo» mostra l'originale dentro la nuova inquadratura`);
+  } catch (e) { log('Nuovo formato: ' + e.message); }
+  busy(false);
+};
+
 $('#btnCompare').onclick = () => setCompare(!$('#btnCompare').classList.contains('on'));
 $('#btnPrev').onclick = () => {
   const p = lastMeta?.parent; if (!p) return;
@@ -1097,7 +1161,7 @@ function renderImage(url, meta){
     renderOverlay();   // la mascherina attiva deve comparire anche sulle immagini successive
   }
 
-  $('#btnDl').disabled = $('#btnRefine').disabled = $('#btnSvg').disabled = false;
+  $('#btnDl').disabled = $('#btnRefine').disabled = $('#btnSvg').disabled = $('#btnReformat').disabled = false;
 }
 
 function addToGallery(url, meta){
@@ -1112,7 +1176,7 @@ async function saveToHistory(url, meta){
   try {
     const r = await fetch('/api/history', { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
-        category: cat, ratio: $('#ratio').value, style: $('#style').value,
+        category: cat, ratio: meta?.ratio || $('#ratio').value, style: $('#style').value,
         title: $('#titleTxt').value, subtitle: $('#subTxt').value,
         brief: $('#brief').value, prompt: $('#promptOut').value, image: url,
         text_model: $('#textModel').value, image_model: $('#imageModel').value
@@ -1129,6 +1193,7 @@ $('#btnClear').onclick = () => { $('#brief').value=''; $('#promptOut').value='';
 
 function busy(b){
   ['btnGo','btnIdeas','btnGen','btnRe','btnRefine','btnApprove','btnAnother'].forEach(id=>$('#'+id).disabled=b);
+  $('#btnReformat').disabled = b || !lastImage;
   $('#btnCancel').classList.toggle('hidden', !b);
   if (b) { if (!activeAbort) activeAbort = new AbortController(); }   // craft() → generate() condividono lo stesso
   else activeAbort = null;

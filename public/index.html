@@ -204,6 +204,21 @@
       <button id="btnPrev" disabled title="Torna all'immagine prima della modifica (la versione modificata resta nella galleria)">↶ Versione precedente</button>
       <input type="range" id="compareRange" class="hidden grow" min="0" max="100" value="50" aria-label="Posizione del confronto prima/dopo">
     </div>
+    <div class="row">
+      <select id="reformatRatio" aria-label="Nuovo formato" title="Formato di arrivo: l'immagine resta intera e la scena viene allargata nello spazio che manca">
+        <option value="16:9">16:9 · header, blog, video</option>
+        <option value="1.91:1">1.91:1 · anteprima social</option>
+        <option value="3:1">3:1 · banner</option>
+        <option value="21:9">21:9 · panoramico</option>
+        <option value="3:2">3:2</option>
+        <option value="4:3">4:3</option>
+        <option value="1:1">1:1 · post quadrato</option>
+        <option value="4:5">4:5 · post verticale</option>
+        <option value="2:3">2:3 · copertina libro</option>
+        <option value="9:16">9:16 · storie</option>
+      </select>
+      <button id="btnReformat" disabled title="Porta l'immagine al formato scelto allargando la scena, senza tagliarla">↔ Allarga al formato</button>
+    </div>
 
     <h2>4 · 🏷️ Mascherina testo</h2>
     <div id="maskPanel" class="mask-panel hidden">

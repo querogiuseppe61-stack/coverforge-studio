@@ -69,6 +69,8 @@ Nel riquadro del risultato puoi modificare qualunque immagine: una appena genera
 2. Con **L'LLM prepara l'istruzione** (attiva di default) il modello di testo trasforma la richiesta in un'istruzione precisa in inglese: che cosa cambiare e che cosa conservare (soggetto, composizione, volti, testo presente). Se ha la vista (👁) guarda anche l'immagine. Nel registro trovi in italiano cosa cambierà e cosa resta. Le regole stanno nella sezione `## modifica` della guida CoverForge. Senza la spunta l'istruzione va al generatore così com'è.
 3. **⇆ Prima / dopo** sovrappone l'immagine di partenza a quella modificata: trascina sull'immagine o usa il cursore. **↶ Versione precedente** torna all'immagine di partenza; quella modificata resta nella galleria della sessione.
 
+4. **↔ Allarga al formato** porta l'immagine a un altro formato senza tagliarla: 16:9, 1.91:1 (anteprima social), 3:1, 21:9, 3:2, 4:3, 1:1, 4:5, 2:3, 9:16. L'immagine intera viene messa al centro di una tela del nuovo formato; lo spazio che manca è riempito con una sua versione molto sfocata, che il modello trasforma nel proseguimento della scena. Se il modello restituisce proporzioni diverse, l'app ritaglia al centro per avere il formato esatto, e lo dice nel registro. Nel confronto *Prima / dopo* l'originale compare dentro la nuova inquadratura, così vedi cosa è stato aggiunto. La cronologia registra il nuovo formato.
+
 Il generatore non ritocca: rigenera l'intera immagine seguendo l'originale, quindi qualche dettaglio può cambiare anche fuori dalla zona richiesta, soprattutto il testo e i volti. Conviene una modifica alla volta. Il risultato si salva in cronologia come nuova voce; il collegamento con la versione precedente vale per la sessione in corso.
 
 ## Il mio stile

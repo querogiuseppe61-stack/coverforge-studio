@@ -1089,7 +1089,11 @@ button:focus-visible {
 .compare-before {
   position: absolute;
   inset: 0;
-  background-size: 100% 100%;
+  /* contain: se il formato è cambiato, l'originale compare intero al centro della nuova immagine */
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-color: rgba(5, 8, 15, 0.85);
   border-radius: inherit;
 }
 .compare-line {
