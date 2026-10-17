@@ -1,19 +1,50 @@
 # CoverForge Studio
 
-Copertine, loghi, icone, header e immagini per articoli di blog: scrivi un brief, un LLM scrive il prompt, un modello grafico genera l'immagine (via OpenRouter). Sopra l'immagine puoi comporre testo con la mascherina ed esportare PNG/JPEG/WebP, oppure il solo testo in PNG o SVG.
+Copertine di libri e dischi, loghi, icone, header e immagini per articoli di blog. Scrivi in italiano che cosa ti serve: un modello di testo fa da art director e scrive il prompt, un modello grafico crea l'immagine (tramite [OpenRouter](https://openrouter.ai)). Poi puoi modificarla, comporre il testo sopra ed esportarla.
 
-Richiede **Node.js 20.3 o successivo**.
+![CoverForge Studio: brief, prompt e copertina con il titolo composto dalla mascherina](docs/schermata.png)
 
-## Primo avvio
+<sub>L'immagine nella schermata è un disegno d'esempio fatto per questa pagina, non un risultato generato.</sub>
 
-```bash
-npm install
-cp .env.example .env     # inserisci la tua chiave OpenRouter in OPENROUTER_API_KEY
-```
+## Perché provarla
+
+- **Non serve saper scrivere prompt.** Prima di scrivere il prompt, l'art director elenca le immagini più ovvie per il tema e le scarta; con *Conferma l'idea* vedi l'idea prima di spendere crediti per l'immagine.
+- **Legge i tuoi testi.** Allega capitoli, testi di canzoni, il brief di un marchio o un articolo: l'app ne ricava personaggi, atmosfera, tono, a seconda del tipo di progetto.
+- **Impara il tuo gusto.** Segna le immagini che ti piacciono e l'app ne ricava un profilo di stile, che orienta i prompt successivi.
+- **Modifica completa.** Ritocchi descritti a parole o su una zona segnata, cambio di formato senza tagli, confronto prima/dopo, versioni collegate.
+- **Nessun abbonamento.** Scegli qualunque modello di testo e d'immagine disponibile su OpenRouter e paghi solo quello che usi; il costo di ogni operazione è sempre visibile.
+- **Tutto in locale.** Cronologia, file e immagini stanno sul tuo computer; il server ascolta solo in locale, i font sono inclusi, la guida dei prompt è un file di testo che puoi leggere e modificare.
+
+## Che cosa serve
+
+Un account [OpenRouter](https://openrouter.ai) con un po' di credito e una chiave API ([openrouter.ai/keys](https://openrouter.ai/keys)). Al primo avvio una finestra di benvenuto ti guida: incolli la chiave, la verifichi e scegli una combinazione di modelli («Economica» o «Qualità»), presa fra i modelli disponibili in quel momento. La puoi riaprire con *👋 Guida iniziale* nelle impostazioni.
 
 La chiave può anche essere scritta nel campo "Chiave API" dell'interfaccia: viene ricordata nel browser solo se spunti "Ricorda la chiave", e viaggia solo verso il server locale. Il file `.env` non va mai condiviso né messo in un repository. Il pulsante **Verifica connessione** (nelle impostazioni) controlla che OpenRouter sia raggiungibile e che la chiave funzioni, e mostra i dati di spesa. Il saldo del conto lo legge solo una *management key* di OpenRouter; con una chiave normale vedi il limite di spesa impostato sulla chiave (se c'è) e quanto hai speso con essa, mentre il saldo si controlla nella pagina Credits dell'account su openrouter.ai.
 
-## Avvio
+## Installazione
+
+### Con il programma di installazione (consigliato, non serve Node.js)
+
+I pacchetti per Windows, macOS e Linux vengono costruiti dal workflow *Pacchetti di installazione* di GitHub Actions. Quando viene pubblicata una versione li trovi nella pagina [Releases](https://github.com/querogiuseppe61-stack/coverforge-studio/releases); altrimenti tra gli *Artifacts* dell'ultima esecuzione del workflow, nella scheda *Actions*.
+
+- **Windows**: `CoverForge-Studio-<versione>-Setup.exe`. Il programma non è firmato: se compare «Windows ha protetto il PC», scegli *Ulteriori informazioni* → *Esegui comunque*.
+- **macOS**: il `.dmg` per il tuo processore (`arm64` per Apple Silicon, `x64` per Intel); trascina l'app in *Applicazioni*. Non è firmata: la prima volta aprila con il tasto destro → *Apri*. Se macOS dice che è «danneggiata», in Terminale: `xattr -cr "/Applications/CoverForge Studio.app"`.
+- **Linux**: l'`AppImage`. Rendila eseguibile (`chmod +x CoverForge-Studio-*.AppImage`) e aprila; su alcune distribuzioni serve il pacchetto `libfuse2`.
+
+Nell'app installata i dati (database, immagini, file allegati, log, `.env` facoltativo e una copia modificabile della guida `prompt-guide/cover-forge.md`) stanno nella cartella utente dell'app: `%APPDATA%\CoverForge Studio` su Windows, `~/Library/Application Support/CoverForge Studio` su macOS, `~/.config/CoverForge Studio` su Linux.
+
+### Dai sorgenti (serve Node.js 20.3 o successivo)
+
+Scarica il progetto (*Code* → *Download ZIP*, oppure `git clone`) e avvialo:
+
+- **Windows**: doppio clic su `CoverForge.cmd`.
+- **macOS**: doppio clic su `CoverForge.command` (la prima volta: tasto destro → *Apri*).
+- **Linux**: `bash coverforge.sh` (vedi sotto).
+- **Ovunque**: `npm run web`.
+
+Al primo avvio vengono installate le dipendenze; poi parte il server e si apre il browser su http://localhost:3000. La chiave si può scrivere nell'interfaccia oppure in `.env` (copia `.env.example` in `.env` e compila `OPENROUTER_API_KEY`). Per costruire tu i pacchetti: `npm install`, poi `npm run dist` (crea quello del sistema su cui ti trovi, nella cartella `dist/`).
+
+### Avvio da terminale su Linux
 
 ```bash
 bash coverforge.sh              # finestra Electron se installato, altrimenti browser
@@ -40,6 +71,10 @@ bash install-desktop.sh --menu   # in più lo aggiunge al menu delle applicazion
 ```
 
 Rilancialo se sposti la cartella del progetto.
+
+## Costi
+
+OpenRouter indica in ogni risposta quanto ha addebitato. L'app scrive il costo di ogni operazione nel registro (testo, immagine, profilo di stile) e somma la spesa della sessione nel badge 💳 in alto; in cronologia ogni immagine riporta quanto è costato arrivarci (prompt, eventuali idee, generazione). Se OpenRouter non indica il costo di un'operazione, il badge lo segnala con «+?». Il saldo del conto si vede con *Verifica connessione* (con una management key) o nella pagina Credits di openrouter.ai.
 
 ## Formato dell'immagine
 
@@ -120,3 +155,10 @@ npm run check    # controllo di sintassi di tutti i file JavaScript
 - I file caricati sono controllati sul contenuto (non solo sull'estensione); i non-immagini si scaricano invece di aprirsi nel browser.
 - `npm audit` segnala 3 avvisi moderati (`sprintf-js` → `argparse` → `mammoth`). L'app non è esposta: `argparse` è usato soltanto dal comando `mammoth` da terminale, che CoverForge non usa. Non lanciare `npm audit fix --force`, che installerebbe una versione di `mammoth` molto più vecchia.
 - I 12 font usati (interfaccia e mascherina) sono inclusi in `public/fonts/` (licenza SIL OFL 1.1, vedi `public/fonts/LEGGIMI.txt`): l'app non contatta Google e funziona offline.
+
+## Licenza e crediti
+
+CoverForge Studio è distribuito con licenza [MIT](LICENSE).
+
+- Gli estratti in `prompt-master-main/` vengono dal progetto *Prompt Master* di Nidhin Joseph Nelson, licenza MIT (vedi `prompt-master-main/LICENSE`).
+- I font in `public/fonts/` sono distribuiti con licenza SIL Open Font License 1.1 (vedi `public/fonts/LEGGIMI.txt`).
