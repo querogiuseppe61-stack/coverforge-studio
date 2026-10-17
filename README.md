@@ -31,7 +31,7 @@ Per pubblicare una versione: aggiorna `version` in `package.json`, poi in *Actio
 
 - **Windows**: `CoverForge-Studio-<versione>-Setup.exe`. Il programma non è firmato: se compare «Windows ha protetto il PC», scegli *Ulteriori informazioni* → *Esegui comunque*.
 - **macOS**: il `.dmg` per il tuo processore (`arm64` per Apple Silicon, `x64` per Intel); trascina l'app in *Applicazioni*. Non è firmata: la prima volta aprila con il tasto destro → *Apri*. Se macOS dice che è «danneggiata», in Terminale: `xattr -cr "/Applications/CoverForge Studio.app"`.
-- **Linux**: l'`AppImage`. Rendila eseguibile (`chmod +x CoverForge-Studio-*.AppImage`) e aprila; su alcune distribuzioni serve il pacchetto `libfuse2`.
+- **Linux**: l'`AppImage`. Rendila eseguibile (`chmod +x CoverForge-Studio-*.AppImage`) e aprila; su alcune distribuzioni serve il pacchetto `libfuse2`. Un'AppImage non si installa da sola: per averla nel menu delle applicazioni, con l'icona, aprila con Gear Lever o AppImageLauncher. Per un collegamento sulla scrivania copia nella cartella Scrivania il file `.desktop` che lo strumento ha creato in `~/.local/share/applications`, poi clic destro → *Consenti l'avvio*.
 
 Nell'app installata i dati (database, immagini, file allegati, log, `.env` facoltativo e una copia modificabile della guida `prompt-guide/cover-forge.md`) stanno nella cartella utente dell'app: `%APPDATA%\CoverForge Studio` su Windows, `~/Library/Application Support/CoverForge Studio` su macOS, `~/.config/CoverForge Studio` su Linux.
 

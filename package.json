@@ -30,6 +30,7 @@
   },
   "author": "querogiuseppe61-stack",
   "license": "MIT",
+  "desktopName": "coverforge-studio.desktop",
   "homepage": "https://github.com/querogiuseppe61-stack/coverforge-studio",
   "build": {
     "appId": "io.github.querogiuseppe61-stack.coverforge",
@@ -56,7 +57,8 @@
         "AppImage"
       ],
       "category": "Graphics",
-      "icon": "assets/icon.png"
+      "icon": "assets/linux",
+      "syncDesktopName": true
     },
     "win": {
       "target": [
