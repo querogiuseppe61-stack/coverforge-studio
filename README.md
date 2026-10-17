@@ -148,8 +148,17 @@ Il pulsante **⇪ SVG** traccia l'immagine in locale, senza inviarla a nessun se
 ## Verifica del codice
 
 ```bash
-npm run check    # controllo di sintassi di tutti i file JavaScript
+npm run check                     # controllo di sintassi di tutti i file JavaScript
+npx playwright install chromium   # solo la prima volta: il browser per i test dell'interfaccia
+npm test                          # test automatici (circa 15 secondi)
 ```
+
+I test non usano OpenRouter: un finto OpenRouter (`test/helpers/fake-openrouter.js`) risponde al posto suo e registra le richieste, quindi non servono chiavi e non si spende nulla. Ogni test parte con un server nuovo e un database vuoto in una cartella temporanea.
+
+- `test/server.test.js`: API, cronologia (preferite, versioni, costi), upload con controllo del contenuto, profilo di stile, guida, formato chiesto al modello e ripiego quando il modello lo rifiuta, blocco di Host e origini estranee.
+- `test/ui.test.js`: in Chromium, i flussi principali dell'interfaccia: benvenuto e modelli consigliati, costi, articolo del blog letto per intero, profilo di stile, modifica con l'LLM e confronto prima/dopo, nuovo formato con ritaglio esatto, zona segnata, modello che rifiuta il formato. Se Playwright non è installato questi test vengono saltati.
+
+Su GitHub il workflow *Test* li esegue su ogni PR e a ogni push su `main`; il workflow *Pacchetti di installazione* prova anche i pacchetti costruiti.
 
 
 ## Sicurezza e dipendenze

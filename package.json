@@ -12,7 +12,8 @@
     "electron": "electron .",
     "check": "node --check server.js && node --check electron.js && node --check public/app.js && node --check public/mask.js && node --check public/trace.js && node --check start.js",
     "web": "node start.js",
-    "dist": "electron-builder --publish never"
+    "dist": "electron-builder --publish never",
+    "test": "node --test --test-concurrency=1 test/*.test.js"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
@@ -24,7 +25,8 @@
   },
   "devDependencies": {
     "electron": "^44.7.2",
-    "electron-builder": "26.15.3"
+    "electron-builder": "26.15.3",
+    "playwright": "1.56.1"
   },
   "author": "querogiuseppe61-stack",
   "license": "MIT",
