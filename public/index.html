@@ -201,8 +201,14 @@
     <div class="row">
       <label class="check" title="Il modello di testo trasforma la tua richiesta in un'istruzione precisa in inglese: cosa cambiare e cosa conservare. Se ha la vista (👁) guarda anche l'immagine."><input type="checkbox" id="refineLLM"> L'LLM prepara l'istruzione</label>
       <button id="btnCompare" disabled aria-pressed="false" title="Confronta con l'immagine prima della modifica: trascina sull'immagine o usa il cursore">⇆ Prima / dopo</button>
-      <button id="btnPrev" disabled title="Torna all'immagine prima della modifica (la versione modificata resta nella galleria)">↶ Versione precedente</button>
+      <button id="btnPrev" disabled title="Torna all'immagine prima della modifica (la versione modificata resta nella galleria e in cronologia)">↶ Versione precedente</button>
       <input type="range" id="compareRange" class="hidden grow" min="0" max="100" value="50" aria-label="Posizione del confronto prima/dopo">
+    </div>
+    <div class="row">
+      <button id="btnZone" disabled aria-pressed="false" title="Dipingi sull'immagine la parte da modificare: Rifinisci cambierà solo quella">🖌 Segna la zona</button>
+      <label id="zoneBrushWrap" class="hidden inline-range">Pennello <input type="range" id="zoneBrush" min="8" max="120" value="40" aria-label="Dimensione del pennello"></label>
+      <button id="btnZoneClear" class="hidden">✕ Cancella zona</button>
+      <label class="check" title="Le immagini spuntate nei Riferimenti vanno al generatore come materiale per la modifica (un oggetto, un personaggio, una palette da usare)"><input type="checkbox" id="refineRefs"> Usa nella modifica le immagini spuntate nei Riferimenti</label>
     </div>
     <div class="row">
       <select id="reformatRatio" aria-label="Nuovo formato" title="Formato di arrivo: l'immagine resta intera e la scena viene allargata nello spazio che manca">

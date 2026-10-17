@@ -96,6 +96,7 @@ const addColumn = (table, col, def) => {
 };
 addColumn('history', 'favorite', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('reference_files', 'style_example', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('history', 'parent_id', 'INTEGER');   // versione modificata (Rifinisci, nuovo formato) → riga di partenza
 db.exec('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
 const getSetting = (k) => { const r = db.prepare('SELECT value FROM settings WHERE key=?').get(k); try { return r ? JSON.parse(r.value) : null; } catch { return null; } };
 const setSetting = (k, v) => db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(k, JSON.stringify(v));
@@ -663,13 +664,14 @@ function pruneHistory() {
   const old = db.prepare('SELECT id, image_file FROM history ORDER BY ts DESC, id DESC LIMIT -1 OFFSET ?').all(HISTORY_MAX);
   for (const row of old) {
     db.prepare('DELETE FROM history WHERE id=?').run(row.id);
+    db.prepare('UPDATE history SET parent_id=NULL WHERE parent_id=?').run(row.id);
     removeGeneratedFile(row.image_file);
   }
 }
 
 /* Elenco leggero: niente immagini, solo l'URL da cui caricarle */
 app.get('/api/history', (_req, res) => {
-  const rows = db.prepare(`SELECT id, ts, category, ratio, style, title, subtitle, brief, prompt, text_model, image_model, favorite,
+  const rows = db.prepare(`SELECT id, ts, category, ratio, style, title, subtitle, brief, prompt, text_model, image_model, favorite, parent_id,
       (image_file IS NOT NULL OR image IS NOT NULL) AS has_image
     FROM history ORDER BY ts DESC, id DESC LIMIT 200`).all();
   res.json(rows.map(({ has_image, ...r }) => ({ ...r, image_url: has_image ? `/api/history/${r.id}/image` : null })));
@@ -708,10 +710,11 @@ app.post('/api/history', async (req, res) => {
       return res.status(400).json({ error: 'Formato immagine non valido.' });
     }
 
-    const info = db.prepare(`INSERT INTO history (ts,category,ratio,style,title,subtitle,brief,prompt,image,image_file,text_model,image_model)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    const parentId = Number.isInteger(b.parent_id) && db.prepare('SELECT 1 FROM history WHERE id=?').get(b.parent_id) ? b.parent_id : null;
+    const info = db.prepare(`INSERT INTO history (ts,category,ratio,style,title,subtitle,brief,prompt,image,image_file,text_model,image_model,parent_id)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
       Date.now(), b.category, clip(b.ratio, 20), clip(b.style, 40), clip(b.title, 500), clip(b.subtitle, 500),
-      clip(b.brief, 20000), clip(b.prompt, 20000), imageRemote, imageFile, clip(b.text_model, 200), clip(b.image_model, 200));
+      clip(b.brief, 20000), clip(b.prompt, 20000), imageRemote, imageFile, clip(b.text_model, 200), clip(b.image_model, 200), parentId);
     pruneHistory();
     res.json({ id: info.lastInsertRowid });
   } catch (e) {
@@ -725,6 +728,7 @@ app.delete('/api/history/:id', (req, res) => {
   const id = Number(req.params.id);
   const row = db.prepare('SELECT image_file FROM history WHERE id=?').get(id);
   db.prepare('DELETE FROM history WHERE id=?').run(id);
+  db.prepare('UPDATE history SET parent_id=NULL WHERE parent_id=?').run(id);   // le versioni restano, senza collegamento
   if (row) removeGeneratedFile(row.image_file);
   res.json({ ok: true });
 });

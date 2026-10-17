@@ -74,6 +74,8 @@ function activatable(el, label){
   $('#styleRefs').checked = uiGet('styleRefs') === true;
   $('#refineLLM').checked = uiGet('refineLLM') !== false;   // attiva di default
   $('#refineLLM').onchange = e => uiSet('refineLLM', e.target.checked);
+  $('#refineRefs').checked = uiGet('refineRefs') === true;
+  $('#refineRefs').onchange = e => uiSet('refineRefs', e.target.checked);
   $('#styleRefs').onchange = e => uiSet('styleRefs', e.target.checked);
   $('#useStyle').onchange = e => { uiSet('useStyle', e.target.checked); if (e.target.checked && !styleState.text) log('⚠ Il profilo di stile è vuoto: aggiornalo o scrivilo prima di usarlo.'); };
   const savedLimit = String(uiGet('refLimit') ?? '');
@@ -714,18 +716,26 @@ async function editGuide(){
   } catch { return ''; }
 }
 
-async function craftEditPrompt(instr, source, sourceMeta){
+/* att: { zone, marked, extras } — zona segnata (marked = immagine con la zona in rosso) e immagini di materiale */
+async function craftEditPrompt(instr, source, sourceMeta, att = {}){
   const profile = ($('#useStyle').checked || wantsMyStyle(instr)) && MODE === 'proxy' ? styleState.text.trim() : '';
   if (wantsMyStyle(instr) && !profile) log('⚠ Hai chiesto «il mio stile» ma il profilo di stile è vuoto.');
-  let parts = [];
+  let parts = [], seenExtras = 0;
   if (textModelSeesImages()) {
-    try { parts = [{ type: 'image_url', image_url: { url: await downscaleJpeg(source, 768) } }]; }
+    try { parts = [{ type: 'image_url', image_url: { url: await downscaleJpeg(att.marked || source, 768) } }]; }
     catch { log('⚠ Il modello di testo non può vedere questa immagine: preparo l\'istruzione senza.'); }
+    for (const u of (parts.length ? att.extras || [] : []).slice(0, 2)) {
+      try { parts.push({ type: 'image_url', image_url: { url: await downscaleJpeg(u, 512) } }); seenExtras++; } catch {}
+    }
   }
+  const zoneNote = att.zone
+    ? `\nL'utente ha segnato in rosso la zona da modificare${parts.length ? " (la vedi nell'immagine allegata)" : ''}: la modifica riguarda solo quella zona.${parts.length ? ' Nomina nell\'istruzione che cosa c\'è in quella zona, così il generatore la individua.' : ''}` : '';
+  const extrasNote = att.extras?.length
+    ? `\nAl generatore arrivano anche ${att.extras.length} immagini di materiale scelte dall'utente${seenExtras ? ` (le vedi dopo la prima: ${seenExtras})` : ' (non le vedi)'}: la richiesta può riferirsi a loro («questo oggetto», «questa palette»).` : '';
   const guide = await editGuide();
   const system = `Sei un fotoritoccatore e prompt engineer. L'utente vuole modificare un'immagine esistente con un modello grafico conversazionale, che riceve l'immagine e un'istruzione in inglese e rigenera l'immagine seguendola.
 Tipo di progetto: ${CATS[cat].hint}.${sourceMeta?.prompt ? `\nPrompt con cui l'immagine era stata creata: ${sourceMeta.prompt}` : ''}
-${parts.length ? "L'immagine da modificare è allegata al messaggio: guardala e nomina gli elementi da conservare con le loro caratteristiche visibili." : "Non vedi l'immagine: non inventarne il contenuto e riferisciti agli elementi in modo generico."}${profile ? `\n\n=== STILE PREFERITO DELL'UTENTE ===\n${profile}\n=== FINE STILE ===\nSe la richiesta riguarda lo stile o «il mio stile», porta tecnica, palette, luce e texture verso questo profilo.` : ''}
+${parts.length ? "L'immagine da modificare è allegata al messaggio: guardala e nomina gli elementi da conservare con le loro caratteristiche visibili." : "Non vedi l'immagine: non inventarne il contenuto e riferisciti agli elementi in modo generico."}${zoneNote}${extrasNote}${att.zone || att.extras?.length ? "\nNon descrivere gli allegati né il segno rosso: le frasi su zona e allegati le aggiunge l'app." : ''}${profile ? `\n\n=== STILE PREFERITO DELL'UTENTE ===\n${profile}\n=== FINE STILE ===\nSe la richiesta riguarda lo stile o «il mio stile», porta tecnica, palette, luce e texture verso questo profilo.` : ''}
 
 Scrivi l'istruzione di modifica:
 - dice con precisione COSA cambiare, con parole concrete (luce, colori, materiali, elementi);
@@ -745,20 +755,35 @@ $('#btnRefine').onclick = async () => {
   const source = lastImage, sourceMeta = lastMeta;
   busy(true);
   try {
+    const extras = $('#refineRefs').checked ? getSelectedImageUrls().filter(u => u !== source).slice(0, 2) : [];
+    if ($('#refineRefs').checked && !extras.length) log('⚠ «Usa nella modifica le immagini spuntate» è attivo ma nei Riferimenti non c\'è nessuna immagine spuntata.');
+    const marked = zoneHasPaint() ? await markedImage(source) : null;
+    const att = { zone: Boolean(marked), marked, extras };
     let prompt;
     if ($('#refineLLM').checked) {
       log('L\'LLM prepara l\'istruzione di modifica…');
-      const j = await craftEditPrompt(instr, source, sourceMeta);
+      const j = await craftEditPrompt(instr, source, sourceMeta, att);
       prompt = j.prompt.trim();
       log(`✎ Cambia: ${String(j.cambia ?? '').trim() || '—'} · Resta: ${String(j.conserva ?? '').trim() || '—'}`);
     } else {
       prompt = `Edit this image: ${instr}. Keep overall composition and style.`;
       if (wantsMyStyle(instr) && styleState.text.trim()) prompt += `\nTarget style (described in Italian): ${styleState.text.trim()}`;
     }
+    // ordine degli allegati: immagine da modificare, [immagine con la zona], [materiale]; le frasi lo descrivono
+    const refs = [source];
+    if (marked) {
+      refs.push(marked);
+      prompt += '\n\nThe first attached image is the one to edit. The second attached image is the same picture with the area to change tinted and outlined in red: apply the change only inside that area, blend it seamlessly, and keep everything outside it identical. Do not reproduce the red tint or outline.';
+    }
+    if (extras.length) {
+      refs.push(...extras);
+      prompt += `\n\nThe last ${extras.length === 1 ? 'attached image is' : `${extras.length} attached images are`} material for this edit (an object, a character or a palette the instruction refers to): use ${extras.length === 1 ? 'it' : 'them'} as the instruction says, without copying ${extras.length === 1 ? 'its' : 'their'} background.`;
+    }
+    if (marked || extras.length) log(`Allegati alla modifica: ${[marked ? 'zona segnata' : '', extras.length ? `${extras.length} immagini di materiale` : ''].filter(Boolean).join(' · ')}`);
     log('Rifinisco…');
-    const r = await orFetch('/api/generate', { model: $('#imageModel').value, prompt, referenceImages: [source] });
+    const r = await orFetch('/api/generate', { model: $('#imageModel').value, prompt, referenceImages: refs });
     // il prompt d'origine segue la catena delle modifiche; parent permette confronto e ritorno
-    showImage(r.images[0], { prompt: sourceMeta?.prompt || '', edit: prompt, parent: { url: source, meta: sourceMeta } });
+    showImage(r.images[0], { prompt: sourceMeta?.prompt || '', edit: prompt, ratio: sourceMeta?.ratio, parent: { url: source, meta: sourceMeta } });
     log('Immagine modificata ✔ · «⇆ Prima / dopo» per confrontarla');
   } catch(e){ log('Errore refine: '+e.message); }
   busy(false);
@@ -781,12 +806,88 @@ $('#quickEdit').onchange = e => {
   input.value = text; input.focus(); input.setSelectionRange(text.length, text.length);
 };
 
+/* ── Zona da modificare ──
+   Una tela grande come l'immagine (lato massimo 2048 px) sopra il risultato: si dipinge in rosso la parte
+   da cambiare. Alla rifinitura il generatore riceve l'originale e una copia con la zona in rosso. */
+let zone = null;   // { canvas, observer, painted }
+
+function zoneHasPaint(){ return Boolean(zone?.painted); }
+
+function resetZone(){
+  zone?.observer.disconnect(); zone?.canvas.remove(); zone = null;
+  setZoneMode(false);
+  $('#btnZone').disabled = !lastImage;
+}
+
+function ensureZone(){
+  if (zone) return zone;
+  const img = $('#stage img'); if (!img || !img.naturalWidth) return null;
+  const k = Math.min(1, 2048 / Math.max(img.naturalWidth, img.naturalHeight));
+  const c = document.createElement('canvas'); c.className = 'zone-canvas';
+  c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+  $('#stage').append(c);
+  const place = () => {
+    c.style.left = img.offsetLeft + 'px'; c.style.top = img.offsetTop + 'px';
+    c.style.width = img.clientWidth + 'px'; c.style.height = img.clientHeight + 'px';
+  };
+  const observer = new ResizeObserver(place); observer.observe(img); observer.observe($('#stage')); place();
+  const g = c.getContext('2d'); g.lineCap = g.lineJoin = 'round'; g.strokeStyle = '#ff2828';
+  let last = null;
+  const pt = (e) => { const r = c.getBoundingClientRect(); return { x: (e.clientX - r.left) * c.width / r.width, y: (e.clientY - r.top) * c.height / r.height, s: c.width / r.width }; };
+  const dot = (p) => { g.lineWidth = Number($('#zoneBrush').value) * p.s; g.beginPath(); g.moveTo((last || p).x, (last || p).y); g.lineTo(p.x, p.y); g.stroke(); last = p; zone.painted = true; $('#btnZoneClear').disabled = false; };
+  c.onpointerdown = (e) => { c.setPointerCapture(e.pointerId); last = null; dot(pt(e)); };
+  c.onpointermove = (e) => { if (c.hasPointerCapture(e.pointerId)) dot(pt(e)); };
+  c.onpointerup = () => { last = null; };
+  zone = { canvas: c, observer, painted: false };
+  return zone;
+}
+
+function setZoneMode(on){
+  if (on && !ensureZone()) return log('Apri prima un\'immagine nel riquadro del risultato.');
+  if (on) setCompare(false);
+  zone?.canvas.classList.toggle('drawing', on);
+  $('#btnZone').classList.toggle('on', on); $('#btnZone').setAttribute('aria-pressed', String(on));
+  $('#btnZone').textContent = on ? '✓ Fatto' : '🖌 Segna la zona';
+  $('#zoneBrushWrap').classList.toggle('hidden', !on);
+  $('#btnZoneClear').classList.toggle('hidden', !zoneHasPaint() && !on);
+  $('#btnZoneClear').disabled = !zoneHasPaint();
+}
+
+/* L'originale con la zona velata di rosso e un contorno rosso pieno, che resta leggibile anche su fondi
+   caldi (JPEG, lato massimo 2048 px). Contorno = zona dilatata meno la zona. */
+async function markedImage(source){
+  const img = await maskLoadImage(source);
+  const z = zone.canvas, W = z.width, H = z.height;
+  const ring = document.createElement('canvas'); ring.width = W; ring.height = H;
+  const rg = ring.getContext('2d'), rad = Math.max(3, Math.round(Math.max(W, H) / 200));
+  for (let a = 0; a < 16; a++) rg.drawImage(z, Math.round(Math.cos(a * Math.PI / 8) * rad), Math.round(Math.sin(a * Math.PI / 8) * rad));
+  rg.globalCompositeOperation = 'destination-out'; rg.drawImage(z, 0, 0);
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  g.drawImage(img, 0, 0, W, H);
+  g.globalAlpha = 0.45; g.drawImage(z, 0, 0);
+  g.globalAlpha = 1; g.drawImage(ring, 0, 0);
+  return c.toDataURL('image/jpeg', 0.9);
+}
+
+$('#btnZone').onclick = () => {
+  const on = !$('#btnZone').classList.contains('on');
+  setZoneMode(on);
+  if (on) log('🖌 Dipingi la zona da modificare, poi scrivi la modifica e premi Rifinisci.');
+};
+$('#btnZoneClear').onclick = () => {
+  if (!zone) return;
+  zone.canvas.getContext('2d').clearRect(0, 0, zone.canvas.width, zone.canvas.height);
+  zone.painted = false; setZoneMode($('#btnZone').classList.contains('on'));
+};
+
 /* ── Confronto prima/dopo ── */
 let compareObserver = null;
 
 function setCompare(on){
   const parent = lastMeta?.parent;
   on = Boolean(on && parent);
+  if (on && $('#btnZone').classList.contains('on')) setZoneMode(false);
   $('#btnCompare').classList.toggle('on', on); $('#btnCompare').setAttribute('aria-pressed', String(on));
   $('#compareRange').classList.toggle('hidden', !on);
   compareObserver?.disconnect(); compareObserver = null;
@@ -950,6 +1051,7 @@ async function loadHistory(){
     const rows = await r0.json();
     const h = $('#history'); h.innerHTML = '';
     if (!rows.length) { h.innerHTML = '<div class="placeholder">Nessun progetto salvato</div>'; return; }
+    historyById = new Map(rows.map(r => [r.id, r]));
     rows.forEach(row => {
       const d = document.createElement('div'); d.className='hist-item';
       if (row.image_url) {
@@ -960,7 +1062,7 @@ async function loadHistory(){
       const meta = document.createElement('div'); meta.className = 'meta';
       const cat = document.createElement('b'); cat.textContent = row.category;
       meta.append(cat,
-        document.createTextNode(` · ${row.ratio||''}${row.style ? ' · ' + row.style : ''}`),
+        document.createTextNode(` · ${row.ratio||''}${row.style ? ' · ' + row.style : ''}${row.parent_id ? ' · ✎ versione' : ''}`),
         document.createElement('br'),
         document.createTextNode(row.brief || row.prompt || ''));
       meta.onclick = () => restoreRow(row);
@@ -982,6 +1084,15 @@ async function loadHistory(){
     });
   } catch(e){ log('Cronologia: '+e.message); }
 }
+/* Versioni: una riga modificata punta alla riga di partenza (parent_id); il meta ricostruisce la catena,
+   così «Prima / dopo» e «Versione precedente» funzionano anche nelle sessioni successive. */
+let historyById = new Map();
+function historyMeta(row, depth = 0){
+  const parent = row.parent_id && depth < 20 ? historyById.get(row.parent_id) : null;
+  return { prompt: row.prompt, historyId: row.id, favorite: Boolean(row.favorite), ratio: row.ratio,
+    parent: parent?.image_url ? { url: parent.image_url, meta: historyMeta(parent, depth + 1) } : undefined };
+}
+
 function restoreRow(row){
   cat = row.category;
   document.querySelectorAll('.cat').forEach(x=>x.classList.toggle('on', x.dataset.k===row.category));
@@ -989,7 +1100,7 @@ function restoreRow(row){
   $('#style').value = row.style || '';
   $('#brief').value = row.brief || '';
   $('#promptOut').value = row.prompt || '';
-  if (row.image_url) renderImage(row.image_url, { prompt: row.prompt, historyId: row.id, favorite: Boolean(row.favorite) });   // niente nuovo salvataggio
+  if (row.image_url) renderImage(row.image_url, historyMeta(row));   // niente nuovo salvataggio
   log('Ripristinato dalla cronologia');
 }
 $('#btnHistReload').onclick = loadHistory;
@@ -1140,6 +1251,7 @@ function renderImage(url, meta){
   const img = new Image(); img.alt = 'risultato'; img.src = url;   // niente HTML interpolato
   $('#stage').replaceChildren(img);
   updateCompareButtons();
+  resetZone();
   watchStage(img);
 
   // Show mask panel
@@ -1179,7 +1291,8 @@ async function saveToHistory(url, meta){
         category: cat, ratio: meta?.ratio || $('#ratio').value, style: $('#style').value,
         title: $('#titleTxt').value, subtitle: $('#subTxt').value,
         brief: $('#brief').value, prompt: $('#promptOut').value, image: url,
-        text_model: $('#textModel').value, image_model: $('#imageModel').value
+        text_model: $('#textModel').value, image_model: $('#imageModel').value,
+        parent_id: meta?.parent?.meta?.historyId ?? null
       })});
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || r.status);
