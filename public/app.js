@@ -74,6 +74,8 @@ function activatable(el, label){
   $('#styleRefs').checked = uiGet('styleRefs') === true;
   $('#refineLLM').checked = uiGet('refineLLM') !== false;   // attiva di default
   $('#refineLLM').onchange = e => uiSet('refineLLM', e.target.checked);
+  $('#sendAspect').checked = uiGet('sendAspect') !== false;   // attivo di default
+  $('#sendAspect').onchange = e => uiSet('sendAspect', e.target.checked);
   $('#refineRefs').checked = uiGet('refineRefs') === true;
   $('#refineRefs').onchange = e => uiSet('refineRefs', e.target.checked);
   $('#styleRefs').onchange = e => uiSet('styleRefs', e.target.checked);
@@ -240,7 +242,18 @@ async function orFetch(route, body, method='POST'){
       return j;
     }
     const url = route.replace(/^\/api\/models/,`${OR_DIRECT}/models`).replace(/^\/api\/(craft|generate)/,`${OR_DIRECT}/chat/completions`);
-    const r = await fetch(url, { method, signal, headers:{'Authorization':`Bearer ${key()}`,'Content-Type':'application/json','HTTP-Referer':location.origin,'X-Title':'CoverForge Studio'}, body: body ? JSON.stringify(body) : undefined });
+    // senza server la richiesta di generazione va tradotta nel formato di OpenRouter (come fa /api/generate);
+    // le immagini locali (/uploads, cronologia) qui non esistono: passano solo data URL e https
+    const toOR = (withAspect) => route !== '/api/generate' ? body : {
+      model: body.model, modalities: ['image', 'text'],
+      messages: [{ role: 'user', content: [
+        ...(body.referenceImages || []).filter(u => /^(data:image\/|https:\/\/)/.test(u)).map(u => ({ type: 'image_url', image_url: { url: u } })),
+        { type: 'text', text: body.prompt }] }],
+      ...(withAspect && body.aspectRatio ? { image_config: { aspect_ratio: body.aspectRatio } } : {})
+    };
+    const send = (withAspect) => fetch(url, { method, signal, headers:{'Authorization':`Bearer ${key()}`,'Content-Type':'application/json','HTTP-Referer':location.origin,'X-Title':'CoverForge Studio'}, body: body ? JSON.stringify(toOR(withAspect)) : undefined });
+    let r = await send(true), aspectRejected = false;
+    if (r.status === 400 && route === '/api/generate' && body.aspectRatio) { aspectRejected = true; r = await send(false); }
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error?.message || `Errore OpenRouter (HTTP ${r.status}).`);
     if (route === '/api/models') {
@@ -258,7 +271,7 @@ async function orFetch(route, body, method='POST'){
     if (route === '/api/craft') return { content: msg.content };
     const imgs = (msg.images||[]).map(i=>i.image_url?.url).filter(Boolean);
     if (!imgs.length) throw new Error('Nessuna immagine: scegli un modello grafico con output image');
-    return { images: imgs };
+    return { images: imgs, aspect: aspectRejected ? 'rifiutato' : body.aspectRatio ? 'inviato' : 'no' };
   } catch (e) {
     if (e.name === 'AbortError') throw new Error('Operazione annullata.');
     if (e.name === 'TimeoutError') throw new Error('Tempo scaduto: nessuna risposta dal servizio.');
@@ -680,6 +693,27 @@ async function craft({ again = false } = {}){
   } catch(e){ log('Errore craft: '+e.message); busy(false); }
 }
 
+/* Formato da chiedere al modello grafico con image_config (OpenRouter): solo i valori ammessi.
+   Per le modifiche si cerca il valore ammesso più vicino alle proporzioni dell'immagine (entro il 2%). */
+const ASPECT_RATIOS = ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'];
+const aspectNoted = new Set();
+function aspectFor(ratio){
+  if (!$('#sendAspect').checked) return null;
+  if (ASPECT_RATIOS.includes(ratio)) return ratio;
+  if (!aspectNoted.has(ratio)) { aspectNoted.add(ratio); log(`Il formato ${ratio} non è tra quelli che OpenRouter accetta come parametro: resta solo nel prompt.`); }
+  return null;
+}
+function aspectForSize(w, h){
+  if (!$('#sendAspect').checked || !w || !h) return null;
+  return ASPECT_RATIOS.find(a => Math.abs((w / h) / parseRatio(a) - 1) <= 0.02) || null;
+}
+function noteAspect(res, ratio){
+  if (res.aspect === 'rifiutato' && !aspectNoted.has('rej:' + $('#imageModel').value)) {
+    aspectNoted.add('rej:' + $('#imageModel').value);
+    log(`Il modello grafico non accetta il parametro di formato: ho rigenerato senza (${ratio} resta nel prompt).`);
+  }
+}
+
 $('#btnGen').onclick = () => generate();
 $('#btnRe').onclick = () => generate('Small variation of the same concept, keep coherence: ');
 async function generate(prefix=''){
@@ -692,7 +726,9 @@ async function generate(prefix=''){
     const styleRefs = styleRefImages(refImages);
     // le immagini di stile vanno in coda: la frase aggiunta al prompt le indica come «le ultime N»
     const fullPrompt = styleRefs.length ? `${prompt}\n\n${styleRefsSentence(styleRefs.length)}` : prompt;
-    const r = await orFetch('/api/generate', { model: $('#imageModel').value, prompt: fullPrompt, referenceImages: [...refImages, ...styleRefs] });
+    const ratio = $('#ratio').value;
+    const r = await orFetch('/api/generate', { model: $('#imageModel').value, prompt: fullPrompt, referenceImages: [...refImages, ...styleRefs], aspectRatio: aspectFor(ratio) });
+    noteAspect(r, ratio);
     showImage(r.images[0], { prompt });
     log('Immagine ricevuta ✔');
   } catch(e){
@@ -781,7 +817,11 @@ $('#btnRefine').onclick = async () => {
     }
     if (marked || extras.length) log(`Allegati alla modifica: ${[marked ? 'zona segnata' : '', extras.length ? `${extras.length} immagini di materiale` : ''].filter(Boolean).join(' · ')}`);
     log('Rifinisco…');
-    const r = await orFetch('/api/generate', { model: $('#imageModel').value, prompt, referenceImages: refs });
+    // la modifica deve conservare le proporzioni: si chiede il formato dell'immagine di partenza, se è tra quelli ammessi
+    const dims = await maskLoadImage(source).then(i => [i.naturalWidth, i.naturalHeight]).catch(() => []);
+    const aspect = aspectForSize(...dims);
+    const r = await orFetch('/api/generate', { model: $('#imageModel').value, prompt, referenceImages: refs, aspectRatio: aspect });
+    if (aspect) noteAspect(r, aspect);
     // il prompt d'origine segue la catena delle modifiche; parent permette confronto e ritorno
     showImage(r.images[0], { prompt: sourceMeta?.prompt || '', edit: prompt, ratio: sourceMeta?.ratio, parent: { url: source, meta: sourceMeta } });
     log('Immagine modificata ✔ · «⇆ Prima / dopo» per confrontarla');
@@ -981,7 +1021,8 @@ $('#btnReformat').onclick = async () => {
       + `Keep the original central part exactly as it is: same subject, composition, faces and any text. Do not add new main subjects, borders, frames or text in the extended areas.`
       + (sourceMeta?.prompt ? ` The scene was originally described as: ${sourceMeta.prompt}` : '');
     log(`Allargo la scena al formato ${target} (${wider ? 'ai lati' : 'sopra e sotto'})…`);
-    const res = await orFetch('/api/generate', { model: $('#imageModel').value, prompt, referenceImages: [padded] });
+    const res = await orFetch('/api/generate', { model: $('#imageModel').value, prompt, referenceImages: [padded], aspectRatio: aspectFor(target) });
+    noteAspect(res, target);
     const out = await enforceRatio(res.images[0], r).catch(() => ({ url: res.images[0], cropped: false }));
     if (out.cropped) log(`Il modello ha restituito ${out.from}: ritaglio al centro per avere esattamente ${target}.`);
     showImage(out.url, { prompt: sourceMeta?.prompt || '', edit: prompt, ratio: target, parent: { url: source, meta: sourceMeta } });
