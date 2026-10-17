@@ -3,6 +3,7 @@
 Questo file viene letto dal server a ogni richiesta (non serve riavviare dopo una modifica).
 Ogni sezione `## nome` è usata solo quando serve: `generale` sempre; la sezione del tipo di progetto
 (`libro`, `album`, `logo`, `icona`, `header`, `blog`); `testo` oppure `senza-testo`; `riferimenti` solo se ci sono immagini allegate.
+`modifica` si usa solo per «Rifinisci», quando l'LLM prepara l'istruzione di modifica.
 Le istruzioni sono per il modello che scrive il prompt; il prompt finale deve essere in inglese.
 Versione 3: più libertà creativa e regola specifica per la saggistica. Le versioni precedenti sono in `cover-forge.v1-minimale.bak` (molto prescrittiva) e `cover-forge.v2.bak` (senza la regola sulla saggistica).
 
@@ -73,3 +74,12 @@ L'immagine non deve contenere lettere, numeri, loghi né filigrane. Non lasciare
 All'immagine verranno allegate automaticamente una o più immagini di riferimento: nel prompt scrivi una frase che chieda al generatore di usarle come guida per ciò che serve (stile, palette, composizione, atmosfera) senza copiarle alla lettera, ad esempio
 "Use the attached reference image(s) as guidance for the color palette and mood, but create an original composition."
 Non descrivere né chiedere all'utente di allegare nulla: l'allegato è già fatto.
+
+## modifica
+
+Il generatore non ritocca: rigenera tutta l'immagine seguendo l'originale. Tutto ciò che l'istruzione non protegge può cambiare, quindi conta quanto dici cosa resta.
+Nomina gli elementi da conservare con i tratti visibili che li identificano ("the woman in the red coat on the left", "the lighthouse on the cliff"), così il generatore li riconosce e li mantiene.
+Luce: descrivi direzione, colore, durezza e ombre di arrivo, non solo "più scura". Palette: nomina i colori di arrivo e dove vanno. Stile: cambia tecnica e trattamento, ma tieni soggetti, pose e composizione.
+Togliere un elemento: descrivi che cosa appare al suo posto (il cielo continua, il muro prosegue, la superficie del tavolo è libera), non solo "remove X".
+Testo nell'immagine: se c'è e la richiesta non lo riguarda, chiedi di conservarlo identico, lettera per lettera; se va tolto, chiedi di ricostruire lo sfondo al suo posto.
+Una modifica alla volta: più cambiamenti nella stessa istruzione fanno deragliare il risultato.

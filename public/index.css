@@ -1078,6 +1078,42 @@ button:focus-visible {
   margin-bottom: 0;
 }
 
+/* ── Confronto prima/dopo: l'immagine precedente copre la parte sinistra di quella attuale ── */
+.compare-overlay {
+  position: absolute;
+  z-index: 12;
+  border-radius: var(--radius-sm);
+  cursor: ew-resize;
+  touch-action: none;
+}
+.compare-before {
+  position: absolute;
+  inset: 0;
+  background-size: 100% 100%;
+  border-radius: inherit;
+}
+.compare-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: #fff;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+}
+.compare-tag {
+  position: absolute;
+  top: 8px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+}
+.compare-tag.before { left: 8px; }
+.compare-tag.after { right: 8px; }
+#quickEdit { width: auto; max-width: 220px; }
+
 /* ── Il mio stile ── */
 .style-status {
   font-size: 11px;
@@ -1088,7 +1124,7 @@ button:focus-visible {
 .style-status .warn { color: var(--acc2); }
 #styleProfile { font-size: 12px; line-height: 1.5; }
 
-.hist-item button.fav, .ref-style {
+.hist-item button.fav, .ref-style, .ref-open {
   font-size: 13px;
   padding: 2px 4px;
   background: transparent;
@@ -1098,5 +1134,6 @@ button:focus-visible {
   filter: grayscale(1);
   opacity: 0.55;
 }
-.hist-item button.fav:hover, .ref-style:hover { color: var(--txt); background: var(--panel-hover); opacity: 1; }
+.hist-item button.fav:hover, .ref-style:hover, .ref-open:hover { color: var(--txt); background: var(--panel-hover); opacity: 1; }
 .hist-item button.fav.on, .ref-style.on { filter: none; opacity: 1; }
+.ref-open { filter: none; opacity: 1; color: var(--txt-sec); }

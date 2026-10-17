@@ -72,6 +72,8 @@ function activatable(el, label){
   $('#approveIdea').checked = uiGet('approve') === true;
   $('#useStyle').checked = uiGet('useStyle') === true;
   $('#styleRefs').checked = uiGet('styleRefs') === true;
+  $('#refineLLM').checked = uiGet('refineLLM') !== false;   // attiva di default
+  $('#refineLLM').onchange = e => uiSet('refineLLM', e.target.checked);
   $('#styleRefs').onchange = e => uiSet('styleRefs', e.target.checked);
   $('#useStyle').onchange = e => { uiSet('useStyle', e.target.checked); if (e.target.checked && !styleState.text) log('⚠ Il profilo di stile è vuoto: aggiornalo o scrivilo prima di usarlo.'); };
   const savedLimit = String(uiGet('refLimit') ?? '');
@@ -309,9 +311,12 @@ async function loadRefFiles(){
         <label class="ref-toggle" title="Includi come riferimento">
           <input type="checkbox" aria-label="Usa come riferimento: ${escapeHtml(row.original_name)}" data-id="${row.id}" data-type="${row.file_type}" data-stored="${escapeHtml(row.stored_name)}" data-name="${escapeHtml(row.original_name)}">
         </label>
+        ${row.file_type === 'image' ? `<button class="ref-open" title="Apri nel riquadro del risultato: da lì puoi rifinirla, comporre il testo o esportarla" aria-label="Apri ${escapeHtml(row.original_name)}">✎</button>` : ''}
         ${row.file_type === 'image' ? `<button class="ref-style${row.style_example ? ' on' : ''}" aria-pressed="${row.style_example ? 'true' : 'false'}" title="Esempio del mio stile: entra nell'archivio da cui si ricava il profilo" aria-label="Esempio di stile: ${escapeHtml(row.original_name)}">🎨</button>` : ''}
         <button class="ref-del" data-id="${row.id}" title="Rimuovi" aria-label="Rimuovi ${escapeHtml(row.original_name)}">✕</button>
       `;
+      const op = d.querySelector('.ref-open');
+      if (op) op.onclick = () => openOnStage(`/uploads/${row.stored_name}`, row.original_name);
       const st = d.querySelector('.ref-style');
       if (st) st.onclick = () => toggleMark(st, `/api/ref-files/${row.id}/style`, 'style');
       d.querySelector('.ref-del').onclick = async () => {
@@ -696,15 +701,135 @@ async function generate(prefix=''){
   busy(false);
 }
 
+/* ── Rifinitura ──
+   Il modello grafico rigenera l'immagine seguendo l'originale: l'istruzione deve dire cosa cambiare e cosa conservare.
+   Con «L'LLM prepara l'istruzione» la richiesta dell'utente diventa un'istruzione precisa in inglese. */
+const wantsMyStyle = (instr) => /\bmio stile\b/i.test(instr);
+
+async function editGuide(){
+  if ($('#promptGuide').value !== 'cover' || MODE !== 'proxy') return '';
+  try {
+    const r = await fetch('/api/prompt-guide');
+    return r.ok ? (await r.json()).sections.modifica || '' : '';
+  } catch { return ''; }
+}
+
+async function craftEditPrompt(instr, source, sourceMeta){
+  const profile = ($('#useStyle').checked || wantsMyStyle(instr)) && MODE === 'proxy' ? styleState.text.trim() : '';
+  if (wantsMyStyle(instr) && !profile) log('⚠ Hai chiesto «il mio stile» ma il profilo di stile è vuoto.');
+  let parts = [];
+  if (textModelSeesImages()) {
+    try { parts = [{ type: 'image_url', image_url: { url: await downscaleJpeg(source, 768) } }]; }
+    catch { log('⚠ Il modello di testo non può vedere questa immagine: preparo l\'istruzione senza.'); }
+  }
+  const guide = await editGuide();
+  const system = `Sei un fotoritoccatore e prompt engineer. L'utente vuole modificare un'immagine esistente con un modello grafico conversazionale, che riceve l'immagine e un'istruzione in inglese e rigenera l'immagine seguendola.
+Tipo di progetto: ${CATS[cat].hint}.${sourceMeta?.prompt ? `\nPrompt con cui l'immagine era stata creata: ${sourceMeta.prompt}` : ''}
+${parts.length ? "L'immagine da modificare è allegata al messaggio: guardala e nomina gli elementi da conservare con le loro caratteristiche visibili." : "Non vedi l'immagine: non inventarne il contenuto e riferisciti agli elementi in modo generico."}${profile ? `\n\n=== STILE PREFERITO DELL'UTENTE ===\n${profile}\n=== FINE STILE ===\nSe la richiesta riguarda lo stile o «il mio stile», porta tecnica, palette, luce e texture verso questo profilo.` : ''}
+
+Scrivi l'istruzione di modifica:
+- dice con precisione COSA cambiare, con parole concrete (luce, colori, materiali, elementi);
+- dice esplicitamente cosa CONSERVARE identico: soggetto, composizione e inquadratura, pose e volti, proporzioni, eventuale testo già presente, salvo che la richiesta li riguardi;
+- una sola modifica coerente: se la richiesta è vaga scegli l'interpretazione più fedele, senza aggiungere cambiamenti non richiesti;
+- in inglese, 30-90 parole, frasi descrittive, niente elenchi né markdown.${guide ? `\n\n=== GUIDA PER LE MODIFICHE ===\n${guide}\n=== FINE GUIDA ===` : ''}
+
+Rispondi SOLO JSON: {"cambia":"in italiano, in una frase, cosa cambierà","conserva":"in italiano, in una frase, cosa resta uguale","prompt":"l'istruzione in inglese"}`;
+  const user = parts.length ? { role: 'user', content: [{ type: 'text', text: instr }, ...parts] } : { role: 'user', content: instr };
+  const j = await askJSON([{ role: 'system', content: system }, user]);
+  if (typeof j.prompt !== 'string' || !j.prompt.trim()) throw new Error('la risposta del modello non contiene l\'istruzione');
+  return j;
+}
+
 $('#btnRefine').onclick = async () => {
   const instr = $('#refineTxt').value.trim(); if (!instr || !lastImage) return;
-  busy(true); log('Rifinisco…');
+  const source = lastImage, sourceMeta = lastMeta;
+  busy(true);
   try {
-    const r = await orFetch('/api/generate', { model: $('#imageModel').value,
-      prompt: `Edit this image: ${instr}. Keep overall composition and style.`, referenceImages: [lastImage] });
-    showImage(r.images[0], { prompt: 'refined' });
+    let prompt;
+    if ($('#refineLLM').checked) {
+      log('L\'LLM prepara l\'istruzione di modifica…');
+      const j = await craftEditPrompt(instr, source, sourceMeta);
+      prompt = j.prompt.trim();
+      log(`✎ Cambia: ${String(j.cambia ?? '').trim() || '—'} · Resta: ${String(j.conserva ?? '').trim() || '—'}`);
+    } else {
+      prompt = `Edit this image: ${instr}. Keep overall composition and style.`;
+      if (wantsMyStyle(instr) && styleState.text.trim()) prompt += `\nTarget style (described in Italian): ${styleState.text.trim()}`;
+    }
+    log('Rifinisco…');
+    const r = await orFetch('/api/generate', { model: $('#imageModel').value, prompt, referenceImages: [source] });
+    // il prompt d'origine segue la catena delle modifiche; parent permette confronto e ritorno
+    showImage(r.images[0], { prompt: sourceMeta?.prompt || '', edit: prompt, parent: { url: source, meta: sourceMeta } });
+    log('Immagine modificata ✔ · «⇆ Prima / dopo» per confrontarla');
   } catch(e){ log('Errore refine: '+e.message); }
   busy(false);
+};
+
+/* Modifiche rapide: scrivono l'istruzione nel campo, che resta modificabile */
+$('#quickEdit').onchange = e => {
+  const v = e.target.value; e.target.value = '';
+  if (!v) return;
+  let text = v;
+  if (v === '__style') {
+    const s = $('#style').value;
+    if (!s) return log('Scegli prima uno stile nel menu «Stile artistico».');
+    text = `Applica questo stile mantenendo soggetto e composizione: ${STYLES[s]}`;
+  } else if (v === '__mystyle') {
+    if (!styleState.text.trim()) return log('Il profilo di stile è vuoto: aggiornalo nella sezione «Il mio stile».');
+    text = 'Riporta l\'immagine al mio stile, mantenendo soggetto e composizione';
+  } else if (v === '__remove') text = 'Togli ';
+  const input = $('#refineTxt');
+  input.value = text; input.focus(); input.setSelectionRange(text.length, text.length);
+};
+
+/* ── Confronto prima/dopo ── */
+let compareObserver = null;
+
+function setCompare(on){
+  const parent = lastMeta?.parent;
+  on = Boolean(on && parent);
+  $('#btnCompare').classList.toggle('on', on); $('#btnCompare').setAttribute('aria-pressed', String(on));
+  $('#compareRange').classList.toggle('hidden', !on);
+  compareObserver?.disconnect(); compareObserver = null;
+  $('#stage .compare-overlay')?.remove();
+  if (!on) return;
+  const img = $('#stage img');
+  const ov = document.createElement('div'); ov.className = 'compare-overlay';
+  const before = document.createElement('div'); before.className = 'compare-before';
+  before.style.backgroundImage = `url("${String(parent.url).replace(/"/g, '%22')}")`;
+  const line = document.createElement('div'); line.className = 'compare-line';
+  const t1 = document.createElement('span'); t1.className = 'compare-tag before'; t1.textContent = 'Prima';
+  const t2 = document.createElement('span'); t2.className = 'compare-tag after'; t2.textContent = 'Dopo';
+  ov.append(before, line, t1, t2);
+  $('#stage').append(ov);
+  const place = () => {
+    ov.style.left = img.offsetLeft + 'px'; ov.style.top = img.offsetTop + 'px';
+    ov.style.width = img.clientWidth + 'px'; ov.style.height = img.clientHeight + 'px';
+  };
+  const setPos = (pct) => {
+    pct = Math.max(0, Math.min(100, pct));
+    before.style.clipPath = `inset(0 ${100 - pct}% 0 0)`;
+    line.style.left = pct + '%';
+    $('#compareRange').value = String(Math.round(pct));
+  };
+  const fromPointer = (e) => { const r = ov.getBoundingClientRect(); setPos((e.clientX - r.left) / r.width * 100); };
+  ov.onpointerdown = (e) => { ov.setPointerCapture(e.pointerId); fromPointer(e); };
+  ov.onpointermove = (e) => { if (ov.hasPointerCapture(e.pointerId)) fromPointer(e); };
+  $('#compareRange').oninput = (e) => setPos(Number(e.target.value));
+  compareObserver = new ResizeObserver(place); compareObserver.observe(img); compareObserver.observe($('#stage'));
+  place(); setPos(50);
+}
+
+function updateCompareButtons(){
+  const has = Boolean(lastMeta?.parent);
+  $('#btnCompare').disabled = $('#btnPrev').disabled = !has;
+  setCompare(false);
+}
+
+$('#btnCompare').onclick = () => setCompare(!$('#btnCompare').classList.contains('on'));
+$('#btnPrev').onclick = () => {
+  const p = lastMeta?.parent; if (!p) return;
+  renderImage(p.url, p.meta || { prompt: '' });
+  log('Tornato alla versione precedente (quella modificata resta nella galleria).');
 };
 
 /* ── Esportazione ── */
@@ -922,6 +1047,19 @@ $('#btnStyleBuild').onclick = async () => {
   busy(false); btn.disabled = false;
 };
 
+/* Un'immagine non generata qui (allegato o file dal computer) nel riquadro del risultato:
+   si può rifinire, comporre con la mascherina, esportare. Non entra in cronologia finché non la rifinisci. */
+function openOnStage(url, name){
+  const meta = { prompt: '' };
+  renderImage(url, meta);
+  addToGallery(url, meta);
+  $('#stage').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  log(`Aperta: ${name}. Puoi rifinirla, aggiungere testo con la mascherina o esportarla.`);
+}
+
+$('#btnOpenImg').onclick = () => $('#openImgInput').click();
+$('#openImgInput').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) maskUseOwnImage(f); };
+
 /* ── Utility ── */
 /* Una nuova immagine generata: mostra, aggiungi alla galleria, salva in cronologia */
 function showImage(url, meta){
@@ -937,6 +1075,7 @@ function renderImage(url, meta){
   setFavButton(meta?.favorite);
   const img = new Image(); img.alt = 'risultato'; img.src = url;   // niente HTML interpolato
   $('#stage').replaceChildren(img);
+  updateCompareButtons();
   watchStage(img);
 
   // Show mask panel
