@@ -14,7 +14,10 @@
     <span class="logo">◆</span>
     <span class="brand-name">CoverForge <em>Studio</em></span>
   </div>
-  <div class="conn" id="connBadge" role="status">connessione…</div>
+  <div class="topbar-right">
+    <div class="conn" id="costBadge" title="Spesa su OpenRouter in questa sessione (il costo di ogni operazione è nel registro)">💳 $0.00</div>
+    <div class="conn" id="connBadge" role="status">connessione…</div>
+  </div>
 </header>
 <div class="hero">
   <h1>Crea copertine, loghi &amp; artwork</h1>
@@ -32,6 +35,7 @@
     </label>
     <div class="row check-row">
       <button type="button" id="btnCheck" title="Controlla che OpenRouter sia raggiungibile e che la chiave funzioni">🔌 Verifica connessione</button>
+      <button type="button" id="btnWelcome" title="Riapri la procedura di benvenuto: chiave e modelli consigliati">👋 Guida iniziale</button>
     </div>
     <div id="checkResult" class="check-result" role="status" aria-live="polite"></div>
     <label>Modello LLM (art director)
@@ -336,6 +340,30 @@
     <div class="log" id="log" role="log" aria-live="polite" aria-label="Registro attività"></div>
   </section>
 </main>
+<dialog id="welcome" class="welcome" aria-labelledby="wTitle">
+  <h2 id="wTitle">Benvenuto in CoverForge Studio</h2>
+  <p>Scrivi che cosa ti serve (una copertina, un logo, l'immagine di un articolo): un modello di testo fa da art director e scrive il prompt, un modello grafico crea l'immagine. Per cominciare servono due cose.</p>
+
+  <h3>1 · Una chiave OpenRouter</h3>
+  <p>OpenRouter è il servizio attraverso cui l'app usa i modelli di testo e di immagine. Non c'è abbonamento: carichi un credito e paghi solo quello che usi. Crea un account e una chiave su <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer">openrouter.ai/keys</a> e incollala qui.</p>
+  <p id="wServerKey" class="w-ok hidden">✔ Il server ha già una chiave nel file <code>.env</code>: puoi saltare questo passo.</p>
+  <div class="row">
+    <input type="password" id="wKey" class="grow" placeholder="sk-or-v1-…" autocomplete="off" aria-label="Chiave API OpenRouter">
+    <button type="button" id="wCheck">🔌 Verifica</button>
+  </div>
+  <label class="check"><input type="checkbox" id="wRemember"> Ricorda la chiave in questo browser</label>
+  <div id="wCheckResult" class="check-result" role="status" aria-live="polite"></div>
+
+  <h3>2 · I modelli</h3>
+  <p>Scegli una combinazione di partenza: l'app prende i modelli più recenti di quel tipo fra quelli disponibili ora su OpenRouter.</p>
+  <div id="wModels" class="w-models">Carico l'elenco dei modelli…</div>
+  <p class="ref-hint">Puoi cambiarli quando vuoi nelle impostazioni. Il costo di ogni operazione compare nel registro, il totale della sessione in alto (💳).</p>
+
+  <div class="row">
+    <button type="button" class="primary" id="wDone">Inizia</button>
+    <button type="button" id="wLater">Più tardi</button>
+  </div>
+</dialog>
 <button id="btnCancel" class="danger cancel-fab hidden" title="Interrompi l'operazione in corso">✕ Annulla</button>
 <script src="mask.js"></script>
 <script src="trace.js"></script>

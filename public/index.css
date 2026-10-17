@@ -88,6 +88,8 @@ body {
   font-weight: 500;
 }
 
+.topbar-right { display: flex; gap: 8px; align-items: center; }
+
 .conn {
   font-size: 11px;
   font-weight: 500;
@@ -1135,6 +1137,31 @@ button:focus-visible {
 }
 .inline-range { display: flex; align-items: center; gap: 8px; font-size: 12px; margin: 0; }
 .inline-range input { width: 110px; }
+
+/* ── Benvenuto ── */
+.welcome {
+  margin: auto;   /* il reset globale azzera i margini: senza, il dialog non è centrato */
+  max-width: 640px;
+  width: calc(100% - 32px);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  background: var(--panel);
+  color: var(--txt);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 24px 28px;
+}
+.welcome::backdrop { background: rgba(0, 0, 0, 0.65); }
+.welcome h2 { margin-top: 0; }
+.welcome h3 { margin: 20px 0 6px; font-size: 14px; }
+.welcome p { line-height: 1.55; font-size: 13px; }
+.welcome a { color: var(--acc2); }
+.w-ok { color: #4ade80; }
+.w-models { display: grid; gap: 8px; font-size: 13px; }
+.w-models label { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); cursor: pointer; }
+.w-models label:has(input:checked) { border-color: var(--acc); background: var(--panel-hover); }
+.w-models input[type="radio"] { width: auto; flex: none; margin: 3px 0 0; accent-color: var(--acc); }
+.w-models small { display: block; color: var(--txt-sec); font-family: var(--mono); font-size: 11px; margin-top: 3px; }
 
 /* ── Il mio stile ── */
 .style-status {

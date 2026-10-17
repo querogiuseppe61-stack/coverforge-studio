@@ -7,3 +7,4 @@ coverforge.db-shm
 *.log
 *.pid
 generated/
+dist/
