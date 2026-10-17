@@ -1,6 +1,6 @@
 {
   "name": "coverforge-studio",
-  "version": "2.1.2",
+  "version": "2.1.3",
   "description": "Copertine, loghi, icone, header e immagini per blog: un LLM scrive il prompt, un modello grafico crea l'immagine (via OpenRouter)",
   "main": "electron.js",
   "private": true,
