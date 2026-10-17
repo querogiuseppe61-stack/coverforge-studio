@@ -27,6 +27,8 @@ La chiave può anche essere scritta nel campo "Chiave API" dell'interfaccia: vie
 
 I pacchetti per Windows, macOS e Linux vengono costruiti dal workflow *Pacchetti di installazione* di GitHub Actions. Quando viene pubblicata una versione li trovi nella pagina [Releases](https://github.com/querogiuseppe61-stack/coverforge-studio/releases); altrimenti tra gli *Artifacts* dell'ultima esecuzione del workflow, nella scheda *Actions*.
 
+Per pubblicare una versione: aggiorna `version` in `package.json`, poi in *Actions* → *Pacchetti di installazione* → *Run workflow* scrivi la versione (per esempio `v2.1.0`). Il workflow costruisce e prova i pacchetti e li allega a una release in bozza; controllala e pubblicala, e GitHub crea il tag.
+
 - **Windows**: `CoverForge-Studio-<versione>-Setup.exe`. Il programma non è firmato: se compare «Windows ha protetto il PC», scegli *Ulteriori informazioni* → *Esegui comunque*.
 - **macOS**: il `.dmg` per il tuo processore (`arm64` per Apple Silicon, `x64` per Intel); trascina l'app in *Applicazioni*. Non è firmata: la prima volta aprila con il tasto destro → *Apri*. Se macOS dice che è «danneggiata», in Terminale: `xattr -cr "/Applications/CoverForge Studio.app"`.
 - **Linux**: l'`AppImage`. Rendila eseguibile (`chmod +x CoverForge-Studio-*.AppImage`) e aprila; su alcune distribuzioni serve il pacchetto `libfuse2`.

@@ -1,13 +1,16 @@
 # Pacchetti di installazione di CoverForge Studio per Linux (AppImage), Windows (installer) e macOS (dmg).
-# Si avvia a mano (Actions → «Pacchetti di installazione» → Run workflow), sulle PR che toccano il pacchetto,
-# oppure pubblicando un tag v*: in quel caso i pacchetti vengono allegati a una release di GitHub in bozza,
-# da controllare e pubblicare.
+# Parte sulle PR che toccano il pacchetto e a mano (Actions → «Pacchetti di installazione» → Run workflow).
+# A mano, indicando una versione (es. v2.1.0, uguale a quella di package.json), i pacchetti vengono allegati
+# a una release di GitHub in bozza: la controlli e la pubblichi, e pubblicandola GitHub crea il tag.
 name: Pacchetti di installazione
 
 on:
   workflow_dispatch:
-  push:
-    tags: ['v*']
+    inputs:
+      versione:
+        description: 'Versione da pubblicare, es. v2.1.0 (crea una release in bozza). Vuoto: solo i pacchetti.'
+        required: false
+        default: ''
   # anche sulle PR che toccano il pacchetto: così un errore di build si vede prima di unire
   pull_request:
     paths:
@@ -54,17 +57,33 @@ jobs:
           if-no-files-found: error
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'workflow_dispatch' && inputs.versione != ''
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+      # la versione deve essere quella del programma: v + "version" di package.json
+      - name: Controllo della versione
+        env:
+          VERSIONE: ${{ inputs.versione }}
+        run: |
+          atteso="v$(node -p "require('./package.json').version")"
+          if [ "$VERSIONE" != "$atteso" ]; then
+            echo "::error::La versione indicata ($VERSIONE) non corrisponde a package.json ($atteso)."
+            exit 1
+          fi
       - uses: actions/download-artifact@v4
         with:
           path: pacchetti
           merge-multiple: true
+      # bozza: il tag viene creato da GitHub quando la release viene pubblicata, sul commit di questa esecuzione
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.versione }}
+          target_commitish: ${{ github.sha }}
+          name: CoverForge Studio ${{ inputs.versione }}
           draft: true
+          generate_release_notes: true
           files: pacchetti/*
