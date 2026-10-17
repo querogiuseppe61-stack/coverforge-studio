@@ -1,0 +1,26 @@
+# Test automatici di CoverForge Studio: server (API, database, costi, sicurezza) e interfaccia in Chromium,
+# con un finto OpenRouter (nessuna chiave e nessun costo). Parte su ogni PR e a ogni push su main.
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run check
+      - run: npm test
