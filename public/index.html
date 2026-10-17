@@ -165,8 +165,44 @@
         <option value="16">SVG 16 colori</option>
       </select>
       <button id="btnSvg" disabled title="Vettorializza in locale (per loghi e icone a colori piatti)">⇪ SVG</button>
+    </div>
+    <div class="row">
+      <select id="quickEdit" aria-label="Modifiche rapide" title="Scrive nel campo un'istruzione già pronta: puoi correggerla prima di rifinire">
+        <option value="">✨ Modifiche rapide…</option>
+        <optgroup label="Luce">
+          <option>Trasforma la scena in notte, con luci artificiali calde e ombre profonde</option>
+          <option>Luce dorata del tramonto, radente, con ombre lunghe</option>
+          <option>Controluce drammatico, con i contorni del soggetto illuminati</option>
+          <option>Luce del mattino, morbida e fredda, con una leggera nebbia</option>
+        </optgroup>
+        <optgroup label="Stagione">
+          <option>Rendi la scena invernale, con neve e aria fredda</option>
+          <option>Rendi la scena autunnale, con foglie e toni caldi</option>
+        </optgroup>
+        <optgroup label="Colori e stile">
+          <option>Palette più fredda: blu, verde acqua e grigi</option>
+          <option>Palette più calda: ocra, arancio e rossi terrosi</option>
+          <option>Bianco e nero ad alto contrasto</option>
+          <option value="__style">Applica lo stile artistico scelto nel menu</option>
+          <option value="__mystyle">Riporta l'immagine al mio stile</option>
+        </optgroup>
+        <optgroup label="Pulizia">
+          <option>Togli tutte le scritte, i loghi e le filigrane, ricostruendo lo sfondo</option>
+          <option value="__remove">Togli un elemento…</option>
+          <option>Semplifica: meno elementi e più spazio calmo attorno al soggetto</option>
+          <option>Aggiungi dettaglio e texture, senza cambiare la composizione</option>
+          <option>Sfondo uniforme e pulito, soggetto invariato</option>
+          <option>Lascia una zona calma e a basso contrasto in alto, per il titolo</option>
+        </optgroup>
+      </select>
       <input id="refineTxt" class="grow" aria-label="Istruzioni di rifinitura" placeholder="Rifinisci: rendi i colori più freddi…">
       <button id="btnRefine" disabled>✎ Rifinisci</button>
+    </div>
+    <div class="row">
+      <label class="check" title="Il modello di testo trasforma la tua richiesta in un'istruzione precisa in inglese: cosa cambiare e cosa conservare. Se ha la vista (👁) guarda anche l'immagine."><input type="checkbox" id="refineLLM"> L'LLM prepara l'istruzione</label>
+      <button id="btnCompare" disabled aria-pressed="false" title="Confronta con l'immagine prima della modifica: trascina sull'immagine o usa il cursore">⇆ Prima / dopo</button>
+      <button id="btnPrev" disabled title="Torna all'immagine prima della modifica (la versione modificata resta nella galleria)">↶ Versione precedente</button>
+      <input type="range" id="compareRange" class="hidden grow" min="0" max="100" value="50" aria-label="Posizione del confronto prima/dopo">
     </div>
 
     <h2>4 · 🏷️ Mascherina testo</h2>

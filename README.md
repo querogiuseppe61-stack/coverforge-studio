@@ -61,6 +61,16 @@ Il modello che scrive il prompt tratta l'articolo come fonte principale: prima n
 
 La mascherina propone il preset *Immagine articolo* (titolo e categoria in basso a sinistra).
 
+## Modificare un'immagine
+
+Nel riquadro del risultato puoi modificare qualunque immagine: una appena generata, una della cronologia (clicca la riga), un'immagine allegata nei Riferimenti (pulsante ✎) o un file dal computer (*📂 Carica immagine*).
+
+1. Scrivi la modifica nel campo *Rifinisci*, oppure scegline una da **✨ Modifiche rapide**: luce, stagione, palette, stile artistico, il mio stile, togliere scritte o un elemento, semplificare, aggiungere dettaglio, sfondo pulito, zona calma per il titolo. La modifica rapida scrive l'istruzione nel campo, dove puoi correggerla.
+2. Con **L'LLM prepara l'istruzione** (attiva di default) il modello di testo trasforma la richiesta in un'istruzione precisa in inglese: che cosa cambiare e che cosa conservare (soggetto, composizione, volti, testo presente). Se ha la vista (👁) guarda anche l'immagine. Nel registro trovi in italiano cosa cambierà e cosa resta. Le regole stanno nella sezione `## modifica` della guida CoverForge. Senza la spunta l'istruzione va al generatore così com'è.
+3. **⇆ Prima / dopo** sovrappone l'immagine di partenza a quella modificata: trascina sull'immagine o usa il cursore. **↶ Versione precedente** torna all'immagine di partenza; quella modificata resta nella galleria della sessione.
+
+Il generatore non ritocca: rigenera l'intera immagine seguendo l'originale, quindi qualche dettaglio può cambiare anche fuori dalla zona richiesta, soprattutto il testo e i volti. Conviene una modifica alla volta. Il risultato si salva in cronologia come nuova voce; il collegamento con la versione precedente vale per la sessione in corso.
+
 ## Il mio stile
 
 L'app può imparare il tuo gusto grafico e orientare i prompt di conseguenza.
