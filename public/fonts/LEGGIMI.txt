@@ -1,0 +1,7 @@
+Font incorporati in CoverForge Studio
+=====================================
+Scaricati il 2026-10-16 da Google Fonts (https://fonts.google.com), file woff2 serviti da fonts.gstatic.com.
+Famiglie: Anton, Bebas Neue, Cinzel, Dancing Script, Inter, JetBrains Mono, Lobster, Merriweather, Oswald, Pacifico, Playfair Display, Space Grotesk.
+Sottoinsiemi: latin e latin-ext (italiano e altre lingue europee).
+Licenza: SIL Open Font License 1.1 (https://openfontlicense.org), che consente l'uso e la ridistribuzione con l'app.
+Per aggiornarli: scarica di nuovo da Google Fonts e rigenera fonts.css.

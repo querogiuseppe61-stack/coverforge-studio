@@ -1,0 +1,21 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=CoverForge Studio
+Comment=Crea copertine, loghi, icone e header via OpenRouter
+Exec=bash "/home/pippo/Scrivania/Cover_Forge_Studio/coverforge.sh"
+Path=/home/pippo/Scrivania/Cover_Forge_Studio
+Icon=/home/pippo/Scrivania/Cover_Forge_Studio/assets/icon.svg
+Terminal=true
+StartupNotify=true
+Categories=Graphics;
+Keywords=cover;logo;design;ai;image;generation;
+Actions=Silent;Stop;
+
+[Desktop Action Silent]
+Name=Avvia senza terminale (nel browser)
+Exec=bash "/home/pippo/Scrivania/Cover_Forge_Studio/coverforge-silent.sh"
+
+[Desktop Action Stop]
+Name=Ferma il server
+Exec=bash "/home/pippo/Scrivania/Cover_Forge_Studio/coverforge.sh" --stop

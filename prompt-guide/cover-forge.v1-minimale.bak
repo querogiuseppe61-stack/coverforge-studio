@@ -1,0 +1,66 @@
+# Guida per scrivere i prompt di CoverForge Studio
+
+Questo file viene letto dal server a ogni richiesta (non serve riavviare dopo una modifica).
+Ogni sezione `## nome` è usata solo quando serve: `generale` sempre; la sezione del tipo di progetto
+(`libro`, `album`, `logo`, `icona`, `header`); `testo` oppure `senza-testo`; `riferimenti` solo se ci sono immagini allegate.
+Le istruzioni sono per il modello che scrive il prompt; il prompt finale deve essere in inglese.
+
+## generale
+
+Il generatore di immagini è un modello conversazionale, non uno strumento a parametri: capisce frasi descrittive in inglese naturale.
+Scrivi UN solo prompt, 60-140 parole, come una descrizione continua di ciò che si vede. Ordine consigliato:
+1. soggetto principale, concreto (non "a beautiful scene": cosa, chi, dove);
+2. composizione: punto focale, posizione del soggetto, spazi vuoti da lasciare liberi;
+3. stile e tecnica (es. "gouache illustration", "flat vector", "35mm film photograph");
+4. luce e atmosfera;
+5. palette di colori (2-4 colori nominati);
+6. dettagli di qualità (texture, grana, nitidezza) solo se utili.
+
+Evita:
+- parametri o sintassi tipici di altri strumenti (opzioni con doppio trattino, pesi tra parentesi, "negative prompt", seed, CFG): il formato e le proporzioni sono già impostati dall'app;
+- frasi rivolte all'utente ("attach the reference image to…", "here is your prompt", "note:"), nomi di software o di modelli;
+- virgolette, elenchi puntati, titoli, markdown: solo la descrizione;
+- istruzioni in negativo ("no X, no Y") come unico modo di escludere qualcosa: descrivi invece ciò che c'è ("clean empty sky in the upper third");
+- più concetti in conflitto nella stessa immagine; scegli un'idea sola e portala fino in fondo.
+
+## libro
+
+Copertina di libro: deve funzionare anche in miniatura (come nelle vetrine online). Un unico punto focale forte, forme semplici, contrasto alto.
+Lascia una zona libera e uniforme per il titolo (di solito il terzo superiore) e una più piccola per il nome dell'autore (in basso).
+Evoca il genere con simboli e colori riconoscibili (thriller: toni scuri, un elemento inquietante; romance: toni caldi; fantasy: luce drammatica e profondità; saggistica: composizione pulita e simbolica).
+Evita dettagli minuti vicino ai bordi: verranno tagliati o coperti.
+
+## album
+
+Copertina di disco: formato quadrato, un'immagine che regge anche a 100 pixel. Soggetto centrale o fortemente asimmetrico, forme grandi, pochi colori, un'idea visiva memorabile.
+Lascia spazio pulito se servono nome dell'artista e titolo.
+
+## logo
+
+Logo: stile vettoriale piatto, forme geometriche semplici, linee pulite, colori pieni (massimo 3-4), nessuna sfumatura fotografica, nessun ombreggiato realistico.
+Sfondo uniforme e semplice. Il simbolo deve restare riconoscibile se rimpicciolito e in bianco e nero. Composizione centrata con margine ampio attorno.
+
+## icona
+
+Icona di app: un solo simbolo grande, semplice e centrato, forma riconoscibile al primo sguardo, margine uniforme attorno, colori pieni e contrasto alto, sfondo uniforme.
+Niente testo, niente dettagli sottili che scompaiono a 64 pixel.
+
+## header
+
+Banner largo per un sito. Il soggetto occupa un lato (destra o sinistra) o un'area compatta; il resto è spazio pulito e poco contrastato dove andrà il titolo.
+Composizione orizzontale, orizzonte o linee guida che accompagnano lo sguardo verso il lato libero. Sfondo che non distrae dal testo sovrapposto.
+
+## testo
+
+Il testo richiesto va scritto ESATTAMENTE come indicato, tra virgolette, una sola volta, con una posizione chiara ("the title … centered in the top third") e un carattere descritto in poche parole ("bold condensed serif letters").
+Non aggiungere altre scritte, loghi, filigrane o testo inventato.
+
+## senza-testo
+
+L'immagine non deve contenere lettere, numeri, loghi né filigrane. Descrivi cosa c'è al posto del testo: "clean artwork with no lettering" e lascia le zone libere indicate dal tipo di progetto.
+
+## riferimenti
+
+All'immagine verranno allegate automaticamente una o più immagini di riferimento: nel prompt scrivi una frase che chieda al generatore di usarle come guida per ciò che serve (stile, palette, composizione, atmosfera) senza copiarle alla lettera, ad esempio
+"Use the attached reference image(s) as guidance for the color palette and mood, but create an original composition."
+Non descrivere né chiedere all'utente di allegare nulla: l'allegato è già fatto.

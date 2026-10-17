@@ -1,0 +1,26 @@
+{
+  "name": "coverforge-studio",
+  "version": "2.0.0",
+  "description": "Studio per copertine, loghi, icone e header via OpenRouter",
+  "main": "electron.js",
+  "private": true,
+  "engines": {
+    "node": ">=20.3.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "electron": "electron .",
+    "check": "node --check server.js && node --check electron.js && node --check public/app.js && node --check public/mask.js && node --check public/trace.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mammoth": "^1.13.0",
+    "multer": "^2.4.0",
+    "pdf-parse": "^2.4.5"
+  },
+  "devDependencies": {
+    "electron": "^44.7.2"
+  }
+}

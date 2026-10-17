@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CoverForge Studio</title>
+<link rel="stylesheet" href="fonts/fonts.css">
+<link rel="stylesheet" href="index.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-glow"></div>
+  <div class="brand">
+    <span class="logo">◆</span>
+    <span class="brand-name">CoverForge <em>Studio</em></span>
+  </div>
+  <div class="conn" id="connBadge" role="status">connessione…</div>
+</header>
+<div class="hero">
+  <h1>Crea copertine, loghi &amp; artwork</h1>
+  <p>Scrivi un brief, lascia che l'LLM scriva il prompt, genera l'immagine in un clic.</p>
+</div>
+
+<main class="layout">
+  <aside class="panel settings">
+    <h2>⚙️ Impostazioni</h2>
+    <label>Chiave API OpenRouter
+      <input type="password" id="apiKey" placeholder="sk-or-v1-…" autocomplete="off">
+    </label>
+    <label class="check" title="Meglio tenere la chiave in .env: così non passa dal browser">
+      <input type="checkbox" id="rememberKey"> Ricorda la chiave in questo browser
+    </label>
+    <div class="row check-row">
+      <button type="button" id="btnCheck" title="Controlla che OpenRouter sia raggiungibile e che la chiave funzioni">🔌 Verifica connessione</button>
+    </div>
+    <div id="checkResult" class="check-result" role="status" aria-live="polite"></div>
+    <label>Modello LLM (art director)
+      <select id="textModel"></select>
+    </label>
+    <label>Modello grafico
+      <select id="imageModel"></select>
+    </label>
+    <label title="Istruzioni aggiuntive per il modello che scrive il prompt. «CoverForge» è pensata per questa app (file prompt-guide/cover-forge.md, modificabile).">Guida per il prompt
+      <select id="promptGuide">
+        <option value="cover">CoverForge (consigliata)</option>
+        <option value="pm">Prompt Master (originale)</option>
+        <option value="none">Nessuna</option>
+      </select>
+    </label>
+
+    <h2>📐 Tipo di progetto</h2>
+    <div class="cats" id="cats"></div>
+    <label>Formato
+      <select id="ratio"></select>
+    </label>
+
+    <h2>🎨 Stile artistico</h2>
+    <select id="style" aria-label="Stile artistico">
+      <option value="">— nessuno / descrivi tu —</option>
+      <option value="minimal">Minimal / flat / geometrico</option>
+      <option value="retro">Retro / vintage / 70s</option>
+      <option value="darkfantasy">Dark fantasy / gotico</option>
+      <option value="corporate">Corporate / pulito / professionale</option>
+      <option value="cyberpunk">Cyberpunk / neon / futuristico</option>
+      <option value="watercolor">Acquerello / illustrazione organica</option>
+      <option value="photo">Fotorealistico / cinematic</option>
+      <option value="flat">Flat design / vettoriale</option>
+    </select>
+
+    <h2>🔤 Testo</h2>
+    <label class="check"><input type="checkbox" id="wantText"> Include testo nell'immagine</label>
+    <div id="textFields" class="hidden">
+      <label>Titolo <input id="titleTxt" placeholder="Il silenzio della marea"></label>
+      <label>Secondario <input id="subTxt" placeholder="Elena Fontana"></label>
+    </div>
+
+    <h2>📁 Riferimenti</h2>
+    <p class="ref-hint">Allega file da usare come ispirazione: immagini, PDF, DOCX, TXT, MD. Spunta quelli da usare: i testi vanno al modello che scrive il prompt, le immagini al generatore (e al modello di testo se ha la vista, segnato con 👁).</p>
+    <label>Testo da usare per ogni file
+      <select id="refLimit" title="Se il file è più lungo si usano inizio, metà e fine. Il totale per richiesta è limitato a 60.000 caratteri.">
+        <option value="2000">Breve · circa 1 pagina</option>
+        <option value="4000" selected>Medio · circa 2 pagine</option>
+        <option value="8000">Ampio · circa 4 pagine</option>
+        <option value="16000">Molto ampio · circa 8 pagine</option>
+        <option value="32000">Massimo · circa 16 pagine</option>
+      </select>
+    </label>
+    <div class="ref-upload-area" id="refDropArea">
+      <div class="ref-upload-icon">📂</div>
+      <div class="ref-upload-text">Trascina file qui</div>
+      <div class="ref-upload-sub">oppure</div>
+      <button id="btnRefUpload" class="ref-upload-btn">Scegli file</button>
+      <input type="file" id="refFileInput" multiple accept=".txt,.md,.docx,.pdf,.png,.jpg,.jpeg,.webp,.gif,.bmp" hidden>
+    </div>
+    <div class="ref-list" id="refList"></div>
+    <div class="ref-empty" id="refEmpty">Nessun file allegato</div>
+
+    <h2>📜 Cronologia</h2>
+    <div class="row">
+      <button id="btnHistReload">↻ Ricarica</button>
+      <button id="btnHistClear" class="danger">🗑 Svuota</button>
+    </div>
+    <div class="history" id="history"></div>
+  </aside>
+
+  <section class="panel work">
+    <h2>1 · Descrivi cosa vuoi</h2>
+    <textarea id="brief" rows="5" aria-label="Descrivi cosa vuoi" placeholder="Thriller psicologico in Liguria, mare in tempesta… oppure: fammi delle proposte"></textarea>
+    <div class="row">
+      <button class="primary" id="btnGo">✦ Crea prompt e genera</button>
+      <button id="btnIdeas">💡 Proponimi tu 3 idee</button>
+      <button id="btnClear">Pulisci</button>
+      <label class="check" title="Dopo che il modello ha scelto l'idea, si ferma e ti chiede se generare, scegliere un'altra idea o modificare il prompt. Risparmia crediti d'immagine."><input type="checkbox" id="approveIdea"> Conferma l'idea prima di generare</label>
+    </div>
+
+    <div id="ideasBox" class="ideas hidden"></div>
+
+    <div id="approvalBox" class="approval hidden" role="region" aria-label="Idea proposta" tabindex="-1">
+      <div class="approval-title">Idea proposta</div>
+      <div class="approval-concept" id="approvalConcept"></div>
+      <div class="approval-skipped" id="approvalSkipped"></div>
+      <div class="row">
+        <button class="primary" id="btnApprove">🎨 Genera con questa idea</button>
+        <button id="btnAnother">↻ Altra idea</button>
+        <button id="btnApprovalClose" title="Chiudi senza generare: il prompt resta qui sotto, modificabile">✕ Chiudi</button>
+      </div>
+    </div>
+
+    <h2>2 · Prompt tecnico</h2>
+    <textarea id="promptOut" rows="6" aria-label="Prompt tecnico" placeholder="Prompt scritto dall'LLM"></textarea>
+    <div class="row">
+      <button class="primary" id="btnGen">🎨 Genera immagine</button>
+      <button id="btnRe">↻ Variante</button>
+    </div>
+
+    <h2>3 · Risultato</h2>
+    <div class="stage" id="stage"><div class="placeholder">L'anteprima apparirà qui</div></div>
+    <div class="row">
+      <select id="dlFormat" aria-label="Formato di esportazione">
+        <option value="png">PNG</option>
+        <option value="jpeg">JPEG (85%)</option>
+        <option value="webp">WebP</option>
+      </select>
+      <button id="btnDl" disabled>⬇ Scarica</button>
+      <select id="svgColors" aria-label="Numero di colori per l'SVG" title="Colori usati nella vettorializzazione">
+        <option value="2">SVG 2 colori</option>
+        <option value="4">SVG 4 colori</option>
+        <option value="8" selected>SVG 8 colori</option>
+        <option value="12">SVG 12 colori</option>
+        <option value="16">SVG 16 colori</option>
+      </select>
+      <button id="btnSvg" disabled title="Vettorializza in locale (per loghi e icone a colori piatti)">⇪ SVG</button>
+      <input id="refineTxt" class="grow" aria-label="Istruzioni di rifinitura" placeholder="Rifinisci: rendi i colori più freddi…">
+      <button id="btnRefine" disabled>✎ Rifinisci</button>
+    </div>
+
+    <h2>4 · 🏷️ Mascherina testo</h2>
+    <div id="maskPanel" class="mask-panel hidden">
+      <p class="ref-hint">Trascina i blocchi sull'immagine · Shift+click per selezionarne più di uno · Frecce per spostare (Shift = passo grande) · Ctrl+Z annulla, Ctrl+Y ripeti</p>
+
+      <div class="mask-toolbar">
+        <label class="check"><input type="checkbox" id="maskToggle"> Mostra</label>
+        <select id="maskPreset" title="Preset mascherina"></select>
+        <button id="btnMaskApply">Applica</button>
+        <input id="maskPresetName" maxlength="40" placeholder="Nome nuovo preset…" aria-label="Nome del preset da salvare">
+        <button id="btnMaskSave" title="Salva come preset personale" aria-label="Salva preset">💾</button>
+        <button id="btnMaskDelPreset" class="danger hidden" title="Elimina questo preset">🗑</button>
+      </div>
+
+      <div class="mask-io">
+        <button id="btnMaskExport" title="Esporta mascherina JSON">⬆ JSON</button>
+        <button id="btnMaskImport" title="Importa mascherina JSON">⬇ JSON</button>
+        <button id="btnMaskUploadImg" title="Usa un'immagine tua come base">🖼 Base immagine</button>
+        <input type="file" id="maskImgInput" accept="image/*" hidden>
+        <input type="file" id="maskJsonInput" accept=".json,application/json" hidden>
+      </div>
+
+      <div class="mask-blocks" id="maskBlocks"></div>
+
+      <div class="mask-controls mc-hidden" id="maskControls">
+        <div class="mc-row">
+          <textarea id="mcText" rows="2" placeholder="Testo del blocco (Invio = a capo)"></textarea>
+        </div>
+        <div class="mc-grid">
+          <label>Font<select id="mcFont"></select></label>
+          <label>Peso<select id="mcWeight">
+            <option value="300">Light</option>
+            <option value="400">Normale</option>
+            <option value="500">Medio</option>
+            <option value="600" selected>Semi</option>
+            <option value="700">Bold</option>
+            <option value="800">Extra</option>
+            <option value="900">Black</option>
+          </select></label>
+          <label>Dim<span class="mc-val" id="mcSizeVal">32</span><input type="range" id="mcSize" min="8" max="160" value="32"></label>
+          <label>Opacità<span class="mc-val" id="mcOpacityVal">100</span><input type="range" id="mcOpacity" min="0" max="100" value="100"></label>
+          <label>Rot°<span class="mc-val" id="mcRotVal">0</span><input type="range" id="mcRot" min="-90" max="90" value="0"></label>
+          <label>Interl.<span class="mc-val" id="mcLHVal">1.20</span><input type="range" id="mcLH" min="80" max="220" value="120"></label>
+          <label>X %<span class="mc-val" id="mcXVal">50</span><input type="range" id="mcX" min="0" max="100" step="0.1" value="50"></label>
+          <label>Y %<span class="mc-val" id="mcYVal">50</span><input type="range" id="mcY" min="0" max="100" step="0.1" value="50"></label>
+          <label>Allin.<select id="mcAlign">
+            <option value="left">Sin</option>
+            <option value="center" selected>Ctr</option>
+            <option value="right">Des</option>
+          </select></label>
+          <label>Colore<input type="color" id="mcColor" value="#ffffff"></label>
+          <label class="check"><input type="checkbox" id="mcBg"> Sfondo</label>
+          <label class="check"><input type="checkbox" id="mcShadow" checked> Ombra</label>
+        </div>
+
+        <details class="mc-fx"><summary>✧ Contorno</summary>
+          <div class="mc-grid">
+            <label class="check"><input type="checkbox" id="mcStroke"> Attivo</label>
+            <label>Spess.<span class="mc-val" id="mcStrokeWVal">4</span><input type="range" id="mcStrokeW" min="1" max="20" value="4"></label>
+            <label>Colore<input type="color" id="mcStrokeColor" value="#000000"></label>
+          </div>
+        </details>
+        <details class="mc-fx"><summary>✦ Glow</summary>
+          <div class="mc-grid">
+            <label class="check"><input type="checkbox" id="mcGlow"> Attivo</label>
+            <label>Blur<span class="mc-val" id="mcGlowBlurVal">12</span><input type="range" id="mcGlowBlur" min="2" max="40" value="12"></label>
+            <label>Colore<input type="color" id="mcGlowColor" value="#7c5cff"></label>
+          </div>
+        </details>
+        <details class="mc-fx"><summary>🌈 Gradiente</summary>
+          <div class="mc-grid">
+            <label class="check"><input type="checkbox" id="mcGrad"> Attivo</label>
+            <label>Angolo<span class="mc-val" id="mcGradAngleVal">90</span><input type="range" id="mcGradAngle" min="0" max="360" value="90"></label>
+            <label>Da<input type="color" id="mcGrad1" value="#7c5cff"></label>
+            <label>A<input type="color" id="mcGrad2" value="#22d3ee"></label>
+          </div>
+        </details>
+
+        <div class="row">
+          <button id="btnMaskAddBlk">➕ Blocco</button>
+          <button id="btnMaskDup" title="Duplica blocco">⎘ Duplica</button>
+          <button id="btnMaskDelBlk" class="danger">✕ Rimuovi</button>
+        </div>
+        <div class="row">
+          <button id="btnMaskCopyStyle" title="Copia lo stile del blocco selezionato">⧉ Copia stile</button>
+          <button id="btnMaskPasteStyle" disabled title="Incolla stile sul blocco selezionato">⧫ Incolla</button>
+          <button id="btnMaskGroup" title="Muovi i blocchi selezionati all'unisono">🔗 Gruppo</button>
+          <button id="btnMaskUngroup" title="Rimuovi dal gruppo">⛓ Sciogli</button>
+          <button id="btnMaskFwd" title="Porta avanti (Ctrl+])">⬆ z</button>
+          <button id="btnMaskBack" title="Manda dietro (Ctrl+[)">⬇ z</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <button id="btnUndo" title="Annulla (Ctrl+Z)">↶ Annulla</button>
+        <button id="btnRedo" title="Ripeti (Ctrl+Y)">↷ Ripeti</button>
+      </div>
+
+      <div class="row">
+        <button class="primary" id="btnDlMask" disabled>⬇ Scarica con mascherina</button>
+        <button id="btnDlMaskPng" disabled title="PNG trasparente con solo il testo (sovrapponibile)">◌ PNG testo</button>
+        <button id="btnDlMaskSvg" disabled title="SVG vettoriale con solo il testo (modificabile)">◌ SVG testo</button>
+      </div>
+    </div>
+
+    <h2>Galleria sessione</h2>
+    <div class="gallery" id="gallery"></div>
+    <div class="log" id="log" role="log" aria-live="polite" aria-label="Registro attività"></div>
+  </section>
+</main>
+<button id="btnCancel" class="danger cancel-fab hidden" title="Interrompi l'operazione in corso">✕ Annulla</button>
+<script src="mask.js"></script>
+<script src="trace.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

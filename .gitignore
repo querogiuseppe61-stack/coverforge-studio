@@ -1,0 +1,9 @@
+.env
+node_modules/
+uploads/
+coverforge.db
+coverforge.db-wal
+coverforge.db-shm
+*.log
+*.pid
+generated/
