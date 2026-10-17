@@ -71,6 +71,8 @@ function activatable(el, label){
   $('#promptGuide').onchange = e => uiSet('guide', e.target.value);
   $('#approveIdea').checked = uiGet('approve') === true;
   $('#useStyle').checked = uiGet('useStyle') === true;
+  $('#styleRefs').checked = uiGet('styleRefs') === true;
+  $('#styleRefs').onchange = e => uiSet('styleRefs', e.target.checked);
   $('#useStyle').onchange = e => { uiSet('useStyle', e.target.checked); if (e.target.checked && !styleState.text) log('⚠ Il profilo di stile è vuoto: aggiornalo o scrivilo prima di usarlo.'); };
   const savedLimit = String(uiGet('refLimit') ?? '');
   if ([...$('#refLimit').options].some(o => o.value === savedLimit)) $('#refLimit').value = savedLimit;
@@ -680,7 +682,10 @@ async function generate(prefix=''){
   $('#stage').innerHTML = '<div class="spin"></div>';
   try {
     const refImages = getSelectedImageUrls();
-    const r = await orFetch('/api/generate', { model: $('#imageModel').value, prompt, referenceImages: refImages });
+    const styleRefs = styleRefImages(refImages);
+    // le immagini di stile vanno in coda: la frase aggiunta al prompt le indica come «le ultime N»
+    const fullPrompt = styleRefs.length ? `${prompt}\n\n${styleRefsSentence(styleRefs.length)}` : prompt;
+    const r = await orFetch('/api/generate', { model: $('#imageModel').value, prompt: fullPrompt, referenceImages: [...refImages, ...styleRefs] });
     showImage(r.images[0], { prompt });
     log('Immagine ricevuta ✔');
   } catch(e){
@@ -831,6 +836,22 @@ function renderStyleStatus(){
   else if (styleState.auto && (now.length !== used.size || now.some(k => !used.has(k)))) warn = 'L\'archivio è cambiato dall\'ultimo profilo: puoi aggiornarlo.';
   if (warn) { const w = document.createElement('div'); w.className = 'warn'; w.textContent = warn; el.append(w); }
 }
+
+/* Immagini dell'archivio da allegare al generatore come riferimento di stile (punto «Allega al generatore»).
+   Le prime dell'archivio (le più recenti, alternando esempi e preferite), escluse quelle già allegate come riferimento.
+   Non per logo e icona: lì contano semplicità e forma, e un'immagine ricca spingerebbe il generatore fuori strada. */
+const STYLE_REFS_MAX = 2;
+function styleRefImages(already = []){
+  if (!$('#styleRefs').checked || MODE !== 'proxy') return [];
+  if (cat === 'logo' || cat === 'icona') { log('Riferimenti di stile non allegati: per logo e icona si usa solo il profilo.'); return []; }
+  const urls = styleState.archive.images.map(i => i.url).filter(u => !already.includes(u)).slice(0, STYLE_REFS_MAX);
+  if (!urls.length) log('⚠ «Allega al generatore» è attivo ma l\'archivio di stile è vuoto: proseguo senza.');
+  else log(`Allego ${urls.length} ${urls.length === 1 ? 'immagine' : 'immagini'} dell'archivio come riferimento di stile.`);
+  return urls;
+}
+const styleRefsSentence = (n) => n === 1
+  ? 'The last attached image is a style reference only: borrow its rendering technique, color palette, lighting and texture, not its subject or composition.'
+  : `The last ${n} attached images are style references only: borrow their rendering technique, color palette, lighting and texture, not their subjects or composition.`;
 
 /* ⭐ / 🎨: aggiorna subito il pulsante, poi il server; in caso di errore torna indietro */
 async function toggleMark(btn, url, field, historyId){

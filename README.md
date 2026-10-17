@@ -69,6 +69,7 @@ L'app può imparare il tuo gusto grafico e orientare i prompt di conseguenza.
 2. **Aggiorna il profilo.** Con almeno 3 immagini nell'archivio, *↻ Aggiorna profilo* le manda, ridotte a 512 px, al modello LLM scelto, che deve avere la vista (👁). Il modello scrive una descrizione dello stile: tecnica, palette, luce, composizione, dettaglio, atmosfera, ricorrenze e ciò che manca. Si usano al massimo 16 immagini, alternando esempi 🎨 e preferite ⭐, le più recenti prima.
 3. **Correggilo se serve.** Il profilo è un testo modificabile; *💾 Salva modifiche* lo conserva.
 4. **Spunta «Usa il mio stile nei prompt».** Il profilo entra nelle istruzioni del modello che scrive il prompt.
+5. **Facoltativo: «Allega al generatore 2 immagini dell'archivio».** Oltre al profilo, il generatore riceve le 2 immagini più recenti dell'archivio (alternando esempi 🎨 e preferite ⭐), con una frase che gli chiede di prenderne tecnica, palette, luce e texture, ma non soggetto né composizione. Vale anche per le varianti, non per *Rifinisci*; per logo e icona non si allegano. Alcuni modelli grafici imitano comunque la composizione dei riferimenti: se succede, togli la spunta e affidati al solo profilo.
 
 Il brief e lo *Stile artistico* scelto nel menu hanno la precedenza sul profilo. Per il Blog l'articolo decide l'atmosfera e il profilo il trattamento grafico; per logo e icona del profilo si usano solo palette e gusto generale.
 
