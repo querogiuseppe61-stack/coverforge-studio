@@ -1,7 +1,7 @@
 {
   "name": "coverforge-studio",
-  "version": "2.0.0",
-  "description": "Studio per copertine, loghi, icone, header e immagini per blog via OpenRouter",
+  "version": "2.1.0",
+  "description": "Copertine, loghi, icone, header e immagini per blog: un LLM scrive il prompt, un modello grafico crea l'immagine (via OpenRouter)",
   "main": "electron.js",
   "private": true,
   "engines": {
@@ -10,7 +10,9 @@
   "scripts": {
     "start": "node server.js",
     "electron": "electron .",
-    "check": "node --check server.js && node --check electron.js && node --check public/app.js && node --check public/mask.js && node --check public/trace.js"
+    "check": "node --check server.js && node --check electron.js && node --check public/app.js && node --check public/mask.js && node --check public/trace.js && node --check start.js",
+    "web": "node start.js",
+    "dist": "electron-builder --publish never"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
@@ -21,6 +23,69 @@
     "pdf-parse": "^2.4.5"
   },
   "devDependencies": {
-    "electron": "^44.7.2"
+    "electron": "^44.7.2",
+    "electron-builder": "26.15.3"
+  },
+  "author": "querogiuseppe61-stack",
+  "license": "MIT",
+  "homepage": "https://github.com/querogiuseppe61-stack/coverforge-studio",
+  "build": {
+    "appId": "io.github.querogiuseppe61-stack.coverforge",
+    "productName": "CoverForge Studio",
+    "asar": false,
+    "files": [
+      "server.js",
+      "electron.js",
+      "package.json",
+      "public/**",
+      "prompt-guide/cover-forge.md",
+      "prompt-master-main/SKILL.md",
+      "prompt-master-main/LICENSE",
+      "prompt-master-main/references/**",
+      "assets/icon.png",
+      "LICENSE"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Graphics",
+      "icon": "assets/icon.png"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "CoverForge-Studio-${version}-Setup.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.graphics-design",
+      "icon": "assets/icon.png",
+      "identity": null
+    },
+    "appImage": {
+      "artifactName": "CoverForge-Studio-${version}-${arch}.${ext}"
+    },
+    "dmg": {
+      "artifactName": "CoverForge-Studio-${version}-${arch}.${ext}"
+    }
   }
 }

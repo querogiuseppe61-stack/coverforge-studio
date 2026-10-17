@@ -5,13 +5,33 @@ const http = require('http');
 const { spawn } = require('child_process');
 const { pathToFileURL } = require('url');
 
-const LOG_PATH = path.join(__dirname, 'coverforge.log');
+/* App installata (pacchetto di electron-builder): la cartella del programma può essere di sola lettura,
+   quindi dati, log, .env e guida modificabile stanno nella cartella utente dell'app
+   (Linux ~/.config/CoverForge Studio, Windows %APPDATA%\CoverForge Studio, macOS ~/Library/Application Support/CoverForge Studio).
+   Avviata dai sorgenti (npm run electron) resta tutto com'era, nella cartella del progetto. */
+const PACKAGED = app.isPackaged;
+const DATA_DIR = process.env.DATA_DIR || (PACKAGED ? app.getPath('userData') : '');
+const BASE_DIR = DATA_DIR || __dirname;
+const LOG_PATH = path.join(BASE_DIR, 'coverforge.log');
+const ENV_PATH = path.join(BASE_DIR, '.env');
+
+/* Guida per il prompt: nell'app installata se ne mette una copia modificabile nella cartella dei dati */
+function guideDir() {
+  if (!PACKAGED) return '';
+  const dir = path.join(DATA_DIR, 'prompt-guide');
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, 'cover-forge.md');
+    if (!fs.existsSync(file)) fs.copyFileSync(path.join(__dirname, 'prompt-guide', 'cover-forge.md'), file);
+    return dir;
+  } catch { return ''; }   // copia non riuscita: il server usa quella del programma
+}
 
 /* Porta: variabile d'ambiente, altrimenti la riga PORT di .env (si legge solo quella), altrimenti 3000 */
 function readPort() {
   let p = Number(process.env.PORT);
   if (!p) {
-    try { p = Number(require('dotenv').parse(fs.readFileSync(path.join(__dirname, '.env'))).PORT); } catch { p = 0; }
+    try { p = Number(require('dotenv').parse(fs.readFileSync(ENV_PATH)).PORT); } catch { p = 0; }
   }
   return Number.isInteger(p) && p > 0 && p < 65536 ? p : 3000;
 }
@@ -24,8 +44,10 @@ let serverProc = null;
 let serverExit = null;       // { at, code, signal } oppure { at, error }
 
 /* ── Server ──
-   Si avvia con il `node` vero: process.execPath è il binario di Electron, che non carica i moduli
-   nativi (better-sqlite3) compilati per Node. Se un server CoverForge è già attivo sulla porta
+   Dai sorgenti si avvia con il `node` vero: process.execPath è il binario di Electron, che non carica i moduli
+   nativi (better-sqlite3) compilati per Node. Nell'app installata non c'è un Node di sistema, e i moduli
+   nativi sono ricompilati per Electron: si usa Electron stesso in modalità Node (ELECTRON_RUN_AS_NODE).
+   Se un server CoverForge è già attivo sulla porta
    (es. avviato con coverforge.sh --web) lo si riutilizza e alla chiusura non lo si ferma. */
 function openServerLog() {
   try {
@@ -38,11 +60,17 @@ function openServerLog() {
 
 function startServer() {
   serverExit = null;
-  const nodeBin = process.env.npm_node_execpath || 'node';
+  const nodeBin = PACKAGED ? process.execPath : (process.env.npm_node_execpath || 'node');
   const log = openServerLog();
+  const env = { ...process.env, PORT: String(PORT) };
+  if (PACKAGED) {
+    env.ELECTRON_RUN_AS_NODE = '1';
+    env.DATA_DIR = DATA_DIR;
+    const g = guideDir(); if (g) env.GUIDE_DIR = g;
+  }
   const proc = spawn(nodeBin, [path.join(__dirname, 'server.js')], {
     stdio: log === 'inherit' ? 'inherit' : ['ignore', log, log],
-    env: { ...process.env, PORT: String(PORT) }
+    env, cwd: BASE_DIR
   });
   if (log !== 'inherit') fs.closeSync(log);   // il processo figlio ha la sua copia del descrittore
   serverProc = proc;
@@ -137,8 +165,9 @@ async function askRecovery() {
   const { response } = await dialog.showMessageBox(win && !win.isDestroyed() ? win : undefined, {
     type: 'error', title: 'CoverForge Studio', noLink: true,
     message: 'Il server di CoverForge non è partito',
-    detail: `${why}\n\nCause tipiche: la porta ${PORT} è occupata da un altro programma (cambia PORT in .env), `
-      + `Node.js non è installato o è troppo vecchio (serve 20.3 o successivo).\n\nUltime righe del log:\n${logTail()}`,
+    detail: `${why}\n\nCause tipiche: la porta ${PORT} è occupata da un altro programma (cambia PORT nel file ${ENV_PATH})`
+      + (PACKAGED ? '.' : ', oppure Node.js non è installato o è troppo vecchio (serve 20.3 o successivo).')
+      + `\n\nUltime righe del log:\n${logTail()}`,
     buttons: ['Riprova', 'Apri il log', 'Modalità diretta (limitata)', 'Esci'],
     defaultId: 0, cancelId: 3
   });
