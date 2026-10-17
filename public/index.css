@@ -71,8 +71,9 @@ body {
 }
 
 .logo {
-  font-size: 20px;
-  color: var(--acc2);
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
   filter: drop-shadow(0 0 6px var(--acc2-glow));
 }
 

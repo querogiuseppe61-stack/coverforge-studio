@@ -134,6 +134,7 @@ function createWindow() {
     width: 1400, height: 900, show: false,
     backgroundColor: '#0b0f1a',
     title: 'CoverForge Studio',
+    icon: path.join(__dirname, 'assets', 'icon.png'),   // finestra e barra delle applicazioni su Windows e Linux
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
