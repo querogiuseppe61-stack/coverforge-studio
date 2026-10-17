@@ -48,6 +48,10 @@ const MASK_PRESETS = {
     { text:'Grande Titolo',               x:12, y:28, size:42, color:'#ffffff', weight:700, align:'left', opacity:1, rotation:0, bg:true, shadow:false },
     { text:'Sottotitolo descrittivo…',    x:12, y:44, size:18, color:'#cccccc', weight:400, align:'left', opacity:0.8, rotation:0, bg:true, shadow:false }
   ]},
+  'blog': { name:'📰 Immagine articolo', blocks:[
+    { text:'Titolo dell\'articolo',   x:8, y:74, size:36, color:'#ffffff', weight:700, align:'left', opacity:1, rotation:0, bg:true, shadow:false },
+    { text:'Categoria · 5 min',        x:8, y:88, size:14, color:'#dddddd', weight:500, align:'left', opacity:0.9, rotation:0, bg:true, shadow:false }
+  ]},
   'custom': { name:'✨ Personalizzata', blocks:[
     { text:'Il tuo testo',  x:50, y:50, size:32, color:'#ffffff', weight:600, align:'center', opacity:1, rotation:0, bg:false, shadow:true }
   ]}

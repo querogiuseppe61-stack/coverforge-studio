@@ -9,7 +9,8 @@ const CATS = {
   album:   { label:'💿 Album',  ratios:['1:1','4:5'],        hint:'album cover artwork' },
   logo:    { label:'✒️ Logo',   ratios:['1:1','4:1'],        hint:'vector-style logo, flat, clean background' },
   icona:   { label:'🔲 Icona', ratios:['1:1'],              hint:'app icon, simple bold shape' },
-  header:  { label:'🖥️ Header', ratios:['16:9','3:1','21:9'],hint:'wide web header / hero banner' }
+  header:  { label:'🖥️ Header', ratios:['16:9','3:1','21:9'],hint:'wide web header / hero banner' },
+  blog:    { label:'📰 Blog',   ratios:['16:9','3:2','1.91:1','4:3','1:1'], hint:'featured image of a blog article, shown above the post and as preview when shared' }
 };
 const STYLES = {
   minimal:      'minimalist flat geometric design, very clean negative space, solid colors, modern typography',
@@ -340,6 +341,7 @@ function getSelectedImageUrls(){
 }
 
 const REF_TEXT_TOTAL_CAP = 60000;   // caratteri complessivi dei riferimenti di testo per richiesta
+const BLOG_MIN_CHARS = 30000;       // circa 5.000 parole: per il tipo Blog l'articolo si legge di norma per intero
 const nf = (n) => n.toLocaleString('it-IT');
 
 /* Testi dei file spuntati: per ciascuno al più "refLimit" caratteri (inizio, metà e fine se è più lungo),
@@ -347,7 +349,10 @@ const nf = (n) => n.toLocaleString('it-IT');
 async function buildRefContext(){
   const selected = getSelectedRefs().filter(s => s.type !== 'image');
   if (!selected.length) return { context: '', used: [] };
-  const perFile = Math.max(1000, Math.min(Number($('#refLimit').value) || 4000, Math.floor(REF_TEXT_TOTAL_CAP / selected.length)));
+  // per l'immagine di un articolo serve l'articolo intero (tono e spirito stanno anche nello sviluppo e nella chiusa):
+  // almeno BLOG_MIN_CHARS per file, che coprono un post lungo
+  const wanted = Math.max(Number($('#refLimit').value) || 4000, cat === 'blog' ? BLOG_MIN_CHARS : 0);
+  const perFile = Math.max(1000, Math.min(wanted, Math.floor(REF_TEXT_TOTAL_CAP / selected.length)));
   const used = [], parts = [];
   for (const sel of selected) {
     try {
@@ -450,7 +455,13 @@ const REF_TEXT_HINT = {
   album: "I testi di riferimento sono canzoni o note sul disco. Ricava i temi, le emozioni, l'atmosfera, le immagini poetiche ricorrenti e il genere o le sonorità suggerite. Non citare versi.",
   logo: "I testi di riferimento descrivono la marca. Ricava cosa fa, a chi si rivolge, i valori, il tono di voce e le parole chiave, e traducili in un simbolo semplice e riconoscibile. Rispetta le indicazioni su colori, forme e stile se presenti.",
   icona: "I testi di riferimento descrivono l'app o il prodotto. Ricava la funzione principale e scegli UN solo concetto da rappresentare con un solo simbolo. Rispetta le indicazioni su colori e stile se presenti.",
-  header: "I testi di riferimento sono l'articolo o la pagina a cui serve l'header, oppure descrivono il tono del sito. Ricava l'argomento e il tono e proponi un'immagine che li evochi senza illustrarli alla lettera. Rispetta le indicazioni di stile se presenti."
+  header: "I testi di riferimento sono l'articolo o la pagina a cui serve l'header, oppure descrivono il tono del sito. Ricava l'argomento e il tono e proponi un'immagine che li evochi senza illustrarli alla lettera. Rispetta le indicazioni di stile se presenti.",
+  blog: `I testi di riferimento sono l'articolo del blog a cui serve l'immagine principale: è la fonte più importante, più del brief. Leggilo tutto, compresa la chiusa, e ricava:
+1) l'ARGOMENTO vero, cioè di cosa parla davvero e qual è la sua idea centrale, non solo la parola chiave del titolo;
+2) il TONO, cioè come è scritto (ironico, polemico, intimo, divulgativo, tecnico, malinconico, entusiasta, provocatorio…);
+3) lo SPIRITO, cioè l'intenzione e l'emozione che lascia al lettore (indignazione, speranza, curiosità, nostalgia, invito ad agire…).
+L'immagine deve rendere insieme tutte e tre le cose: chi la vede, prima di leggere, deve intuire il tema e il registro dell'articolo. Tono e spirito decidono luce, palette, stile e atmosfera: un pezzo ironico non ha un'immagine solenne, uno intimo non ha un'immagine da comunicato aziendale.
+Le indicazioni dell'utente nel brief si rispettano (elementi richiesti, stile, colori, vincoli), ma restano dentro il tono e lo spirito dell'articolo, salvo che l'utente chieda espressamente un registro diverso. Non citare frasi dell'articolo e non scrivere il titolo nell'immagine se non è richiesto.`
 };
 
 /* images: { n, seen } — quante immagini sono allegate e se il modello di testo le vede */
@@ -469,20 +480,26 @@ Formato obbligatorio: ${ratio} (${c.hint}).${styleHint}${ctx}${imgNote}${guideBl
     ? `Testo DA inserire ESATTAMENTE: titolo "${$('#titleTxt').value||''}", secondario "${$('#subTxt').value||''}". Riserva spazio leggibile.`
     : `Nessun testo nell'immagine.`;
   const textRefs = refContext ? (REF_TEXT_HINT[cat] || REF_TEXT_HINT.libro) : '';
+  // per il blog il modello scrive prima la sua lettura dell'articolo: un campo da compilare lo obbliga a leggerlo davvero
+  const blogRead = cat === 'blog' && refContext;
+  const articoloField = blogRead ? '"articolo":{"argomento":"...","tono":"...","spirito":"..."},' : '';
+  const articoloRule = blogRead ? `\n- "articolo": la tua lettura dell'articolo, in italiano, una frase per campo: argomento e idea centrale, tono, spirito. Il resto della risposta deve discendere da qui.` : '';
   const imgRule = images.n && mode !== 'ideas'
     ? 'Nel prompt includi una frase che chieda al generatore di usare le immagini allegate come riferimento (stile, palette, atmosfera) senza copiarle.' : '';
   if (mode === 'ideas') return `${base}
-Proponi 3 concept creativi DIVERSI. ${textRefs}
-Rispondi SOLO JSON: {"ideas":[{"title":"...","concept":"descrizione in italiano, 40-70 parole"}]}`;
+Proponi 3 concept creativi DIVERSI. ${textRefs}${blogRead ? ' Tutte e tre le proposte devono essere fedeli al tono e allo spirito dell\'articolo: diverse nell\'idea visiva, non nel registro.' : ''}
+Rispondi SOLO JSON: {${articoloField}"ideas":[{"title":"...","concept":"descrizione in italiano, 40-70 parole"}]}${articoloRule}`;
   // Con la guida CoverForge il modello passa da un'idea scritta: prima scarta le immagini più ovvie, poi sceglie il concept,
   // poi scrive il prompt. Un'istruzione generica ("evita i cliché") viene facilmente ignorata; un campo da compilare no.
   const schema = concept
     ? `Rispondi SOLO JSON con questi campi, in quest'ordine:
-{"ovvie":["...","..."],"concept":"...","prompt":"..."}
+{${articoloField}"ovvie":["...","..."],"concept":"...","prompt":"..."}${articoloRule}
 - "ovvie": le 5 immagini più prevedibili per questo tema. Includi sia quelle letterali (il soggetto mostrato com'è) sia le metafore più usate dall'editoria (due mani che si toccano, uomo contro macchina, mezzo volto e mezzo circuito, la lampadina, la scalata, il bivio, la bilancia). Servono solo per scartarle.
-- "concept": in una frase l'idea visiva scelta. Non deve essere una variante di nessuna delle ovvie. Per un libro non narrativo preferisci un oggetto, un gesto o un luogo concreto e specifico del mondo del libro a una metafora astratta sul tema, oppure un trattamento grafico insolito; per un romanzo i simboli del genere vanno bene, con un'angolatura meno scontata.
+- "concept": in una frase l'idea visiva scelta. Non deve essere una variante di nessuna delle ovvie. ${cat === 'blog'
+    ? "Preferisci un oggetto, un gesto o un luogo concreto e specifico del mondo dell'articolo a una metafora astratta sul tema, e fai in modo che luce e atmosfera dicano il tono e lo spirito che hai letto."
+    : "Per un libro non narrativo preferisci un oggetto, un gesto o un luogo concreto e specifico del mondo del libro a una metafora astratta sul tema, oppure un trattamento grafico insolito; per un romanzo i simboli del genere vanno bene, con un'angolatura meno scontata."}
 - "prompt": il prompt finale in inglese (60-140 parole) che realizza il concept.`
-    : 'Rispondi SOLO JSON: {"prompt":"..."}';
+    : `Rispondi SOLO JSON: {${articoloField}"prompt":"..."}${articoloRule}`;
   return `${base} ${txt}
 Trasforma il brief in UN prompt tecnico in INGLESE (i modelli grafici rendono meglio in inglese). ${textRefs} ${imgRule}
 Struttura: soggetto → composizione/spazi negativi → stile/medium → illuminazione → palette → dettagli qualitativi.
@@ -502,6 +519,7 @@ async function buildTextRequest(mode, userText){
   const system = { role: 'system', content: sysPrompt(mode, refs.context, guide, images, useConcept) };
   const user = parts.length ? { role: 'user', content: [{ type: 'text', text: userText }, ...parts] } : { role: 'user', content: userText };
   const notes = [];
+  if (cat === 'blog' && !refs.used.length) log('⚠ Blog: nessun articolo spuntato nei Riferimenti. Allega il testo dell\'articolo (txt, md, PDF, DOCX) e spuntalo: il prompt ne segue argomento, tono e spirito. Proseguo solo con il brief.');
   if (refs.used.length) notes.push(`testi: ${refs.used.map(u => `${u.name} (${nf(u.chars)}${u.sampled ? ' su ' + nf(u.total) : ''} car.)`).join(', ')}`);
   if (nImg) notes.push(images.seen ? `${parts.length} immagini viste dal modello di testo` : `${nImg} immagini solo per il generatore (il modello di testo non ha la vista)`);
   if (guide) notes.push(`guida «${$('#promptGuide').selectedOptions[0].textContent}»`);
@@ -544,7 +562,10 @@ $('#btnIdeas').onclick = async () => {
   busy(true); log('Chiedo 3 proposte al LLM…');
   try {
     const messages = await buildTextRequest('ideas', $('#brief').value.trim() || 'sorprendimi');
-    const { ideas } = await askJSON(messages);
+    const j = await askJSON(messages);
+    const ideas = j.ideas;
+    const reading = articleReading(j);
+    if (reading) log(`📰 Lettura dell'articolo → ${reading}`);
     if (!Array.isArray(ideas) || !ideas.length) throw new Error('il modello non ha restituito proposte');
     const box = $('#ideasBox'); box.innerHTML=''; box.classList.remove('hidden');
     ideas.forEach(i => {
@@ -567,6 +588,14 @@ $('#btnGo').onclick = () => craft();
 let rejectedIdeas = [];
 let lastProposal = null;   // { label } testo da ricordare se l'utente rifiuta la proposta
 
+/* Lettura dell'articolo (tipo Blog): { argomento, tono, spirito } → testo breve, '' se manca */
+function articleReading(j){
+  const a = j && typeof j.articolo === 'object' && j.articolo ? j.articolo : null;
+  if (!a) return '';
+  return [['Argomento', a.argomento], ['Tono', a.tono], ['Spirito', a.spirito]]
+    .filter(([, v]) => typeof v === 'string' && v.trim()).map(([k, v]) => `${k}: ${v.trim()}`).join(' · ');
+}
+
 function hideApproval(){ $('#approvalBox').classList.add('hidden'); }
 
 function showApproval(j){
@@ -574,6 +603,7 @@ function showApproval(j){
   const skipped = Array.isArray(j.ovvie) ? j.ovvie.filter(x => typeof x === 'string').slice(0, 5) : [];
   $('#approvalConcept').textContent = concept || 'Il prompt è pronto: controllalo qui sotto prima di generare.';
   $('#approvalSkipped').textContent = skipped.length ? `Scartate: ${skipped.join(' · ')}` : '';
+  $('#approvalArticle').textContent = articleReading(j);
   lastProposal = { label: concept || String(j.prompt).slice(0, 200) };
   const box = $('#approvalBox');
   box.classList.remove('hidden');
@@ -598,6 +628,8 @@ async function craft({ again = false } = {}){
     const j = await askJSON(messages);
     if (typeof j.prompt !== 'string' || !j.prompt.trim()) throw new Error('la risposta del modello non contiene il prompt');
     $('#promptOut').value = j.prompt;
+    const reading = articleReading(j);
+    if (reading) log(`📰 Lettura dell'articolo → ${reading}`);
     if (typeof j.concept === 'string' && j.concept.trim()) {
       const scartate = Array.isArray(j.ovvie) ? j.ovvie.filter(x => typeof x === 'string').slice(0, 3).join('; ') : '';
       log(`💡 Idea scelta: ${j.concept.trim()}${scartate ? ` (scartate: ${scartate})` : ''}`);
@@ -763,7 +795,7 @@ function renderImage(url, meta){
 
   if (!maskBlocks.length) {
     // auto-apply preset based on category
-    const presetMap = { libro:'book-cover', album:'album', logo:'logo', icona:'custom', header:'header' };
+    const presetMap = { libro:'book-cover', album:'album', logo:'logo', icona:'custom', header:'header', blog:'blog' };
     const pid = presetMap[cat] || 'custom';
     setTimeout(() => {
       applyMaskPreset(pid, { silent: true });

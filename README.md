@@ -1,6 +1,6 @@
 # CoverForge Studio
 
-Copertine, loghi, icone e header: scrivi un brief, un LLM scrive il prompt, un modello grafico genera l'immagine (via OpenRouter). Sopra l'immagine puoi comporre testo con la mascherina ed esportare PNG/JPEG/WebP, oppure il solo testo in PNG o SVG.
+Copertine, loghi, icone, header e immagini per articoli di blog: scrivi un brief, un LLM scrive il prompt, un modello grafico genera l'immagine (via OpenRouter). Sopra l'immagine puoi comporre testo con la mascherina ed esportare PNG/JPEG/WebP, oppure il solo testo in PNG o SVG.
 
 Richiede **Node.js 20.3 o successivo**.
 
@@ -44,10 +44,22 @@ Rilancialo se sposti la cartella del progetto.
 ## Riferimenti e guida per il prompt
 
 - **File di testo** (txt, md, PDF, DOCX): spunta quelli da usare. Il testo va al modello che scrive il prompt, che ne ricava personaggi, ambientazione, atmosfera e simboli. Per ogni file si usano al più i caratteri scelti in *Testo da usare per ogni file* (da circa 1 a 16 pagine); se il file è più lungo si prendono **inizio, metà e fine**, non solo l'apertura. In totale non si superano 60.000 caratteri per richiesta. Nel registro compare cosa è stato usato.
-- **Come vengono letti i testi dipende dal tipo di progetto**: per un libro (narrativa: personaggi, ambientazione, atmosfera, simboli; saggio: tema, tesi, tono), per un album (temi, emozioni, immagini poetiche, sonorità), per un logo (cosa fa la marca, pubblico, valori, tono, indicazioni su colori e forme), per un'icona (la funzione principale, un solo concetto), per un header (argomento e tono dell'articolo o del sito). Cosa allegare: libro → capitoli, racconti o una sinossi; album → testi delle canzoni e note sul disco; logo → brief di marca o linee guida in PDF/DOCX; icona → descrizione dell'app; header → il testo dell'articolo.
+- **Come vengono letti i testi dipende dal tipo di progetto**: per un libro (narrativa: personaggi, ambientazione, atmosfera, simboli; saggio: tema, tesi, tono), per un album (temi, emozioni, immagini poetiche, sonorità), per un logo (cosa fa la marca, pubblico, valori, tono, indicazioni su colori e forme), per un'icona (la funzione principale, un solo concetto), per un header (argomento e tono dell'articolo o del sito), per il blog (vedi sotto). Cosa allegare: libro → capitoli, racconti o una sinossi; album → testi delle canzoni e note sul disco; logo → brief di marca o linee guida in PDF/DOCX; icona → descrizione dell'app; header → il testo dell'articolo; blog → l'articolo completo.
 - **Immagini**: vanno sempre al generatore, insieme al prompt. Se il modello di testo ha la vista (segnato con 👁 nell'elenco) le riceve anche lui, ridotte, e ne tiene conto scrivendo il prompt; altrimenti il prompt viene scritto senza vederle e include solo una frase che chiede al generatore di usarle come riferimento.
 - **Conferma dell'idea**: con la casella *Conferma l'idea prima di generare* l'app, dopo aver scritto il prompt, si ferma e mostra l'idea scelta (con la guida CoverForge anche le immagini ovvie scartate). Puoi *Generare*, chiedere *Altra idea* (il modello riceve l'elenco di quelle rifiutate, senza ripeterle) oppure *Chiudere* e correggere a mano il prompt. Così non spendi crediti d'immagine su idee che non ti convincono.
 - **Guida per il prompt**: *CoverForge* (predefinita) è un file tuo, `prompt-guide/cover-forge.md`: istruzioni generali, una sezione per tipo di progetto (libro, album, logo, icona, header), una per testo sì/no e una per i riferimenti; si usano solo le sezioni pertinenti e puoi modificarla senza riavviare. *Prompt Master (originale)* usa gli estratti di `prompt-master-main/`, scritti per Midjourney e simili; *Nessuna* non aggiunge nulla.
+
+## Immagine principale per articoli di blog
+
+Il tipo di progetto **📰 Blog** crea la *featured image* di un articolo (formati 16:9, 3:2, 1.91:1 per le anteprime social, 4:3, 1:1).
+
+1. Allega l'articolo nei **Riferimenti** (txt, md, PDF o DOCX): resta salvato nell'app e lo ritrovi nelle sessioni successive.
+2. Spunta l'articolo, scegli **📰 Blog** e scrivi nel brief le tue indicazioni (elementi da includere, stile, colori), oppure lascialo quasi vuoto.
+3. *Crea prompt e genera* (o *Proponimi tu 3 idee*).
+
+Il modello che scrive il prompt tratta l'articolo come fonte principale: prima ne scrive una lettura in tre punti, **argomento**, **tono** e **spirito**, che compare nel registro e nel riquadro *Idea proposta*; poi ne ricava l'idea visiva e il prompt. Le indicazioni del brief vengono rispettate, ma dentro il tono e lo spirito dell'articolo, salvo che chiedi espressamente un registro diverso. Per questo tipo l'articolo viene letto per intero fino a circa 30.000 caratteri (circa 5.000 parole), qualunque sia la scelta in *Testo da usare per ogni file*. Se non c'è nessun articolo spuntato il registro lo segnala e il prompt si basa solo sul brief.
+
+La mascherina propone il preset *Immagine articolo* (titolo e categoria in basso a sinistra).
 
 ## Vettorializzazione (SVG)
 
