@@ -2,7 +2,7 @@
 
 Questo file viene letto dal server a ogni richiesta (non serve riavviare dopo una modifica).
 Ogni sezione `## nome` è usata solo quando serve: `generale` sempre; la sezione del tipo di progetto
-(`libro`, `album`, `logo`, `icona`, `header`); `testo` oppure `senza-testo`; `riferimenti` solo se ci sono immagini allegate.
+(`libro`, `album`, `logo`, `icona`, `header`, `blog`); `testo` oppure `senza-testo`; `riferimenti` solo se ci sono immagini allegate.
 Le istruzioni sono per il modello che scrive il prompt; il prompt finale deve essere in inglese.
 Versione 3: più libertà creativa e regola specifica per la saggistica. Le versioni precedenti sono in `cover-forge.v1-minimale.bak` (molto prescrittiva) e `cover-forge.v2.bak` (senza la regola sulla saggistica).
 
@@ -51,6 +51,13 @@ Niente testo, niente dettagli sottili che scompaiono a 64 pixel. Qui la semplici
 
 Banner largo per un sito. Il soggetto e la scena occupano un lato o una fascia; sull'altro lato la composizione si calma (nebbia, sfumature, spazio con poco dettaglio) per accogliere il titolo sovrapposto, senza diventare un vuoto piatto.
 Composizione orizzontale, con linee o orizzonti che guidano lo sguardo. Lo sfondo non deve competere con il testo.
+
+## blog
+
+Immagine principale (featured image) di un articolo di blog: sta in cima al post e diventa l'anteprima quando l'articolo viene condiviso. Deve far capire a colpo d'occhio di che cosa parla l'articolo e con quale voce: argomento, tono e spirito dell'articolo contano più di ogni altra cosa, e decidono luce, palette, stile e atmosfera.
+Non illustrare il titolo alla lettera e scarta le immagini da archivio fotografico (persone sorridenti al computer, strette di mano, lampadine, frecce che salgono, mani su una tastiera): sono quelle che rendono ogni blog uguale agli altri. Cerca una scena, un oggetto o un gesto concreto e specifico del mondo dell'articolo, oppure una metafora visiva inattesa che ne dica l'idea centrale.
+Un solo punto focale forte e vicino al centro, perché i social e i temi dei blog ritagliano l'immagine in formati diversi (orizzontale, quadrato): niente di essenziale a ridosso dei bordi. Se servirà un titolo sovrapposto, una fascia (di solito in basso o su un lato) resta più calma e a basso contrasto, senza diventare un vuoto piatto.
+Deve reggere anche in miniatura: contrasto chiaro tra soggetto e sfondo, pochi elementi ben leggibili.
 
 ## testo
 

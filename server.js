@@ -598,7 +598,7 @@ app.post('/api/generate', async (req, res) => {
 });
 
 /* ── Cronologia ── */
-const HISTORY_CATEGORIES = ['libro', 'album', 'logo', 'icona', 'header'];
+const HISTORY_CATEGORIES = ['libro', 'album', 'logo', 'icona', 'header', 'blog'];
 const EXT_FOR_MIME = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 'image/gif': '.gif', 'image/bmp': '.bmp' };
 const clip = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
 

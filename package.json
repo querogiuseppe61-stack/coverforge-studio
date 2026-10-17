@@ -1,7 +1,7 @@
 {
   "name": "coverforge-studio",
   "version": "2.0.0",
-  "description": "Studio per copertine, loghi, icone e header via OpenRouter",
+  "description": "Studio per copertine, loghi, icone, header e immagini per blog via OpenRouter",
   "main": "electron.js",
   "private": true,
   "engines": {
