@@ -1,4 +1,6 @@
 require('dotenv').config();
+// app installata: .env (facoltativo) sta nella cartella dei dati, non in quella del programma
+if (process.env.DATA_DIR) require('dotenv').config({ path: require('path').join(process.env.DATA_DIR, '.env') });
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
@@ -96,7 +98,8 @@ const addColumn = (table, col, def) => {
 };
 addColumn('history', 'favorite', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('reference_files', 'style_example', 'INTEGER NOT NULL DEFAULT 0');
-addColumn('history', 'parent_id', 'INTEGER');   // versione modificata (Rifinisci, nuovo formato) → riga di partenza
+addColumn('history', 'parent_id', 'INTEGER');
+addColumn('history', 'cost', 'REAL');           // spesa su OpenRouter per arrivare a questa immagine (prompt + generazione)   // versione modificata (Rifinisci, nuovo formato) → riga di partenza
 db.exec('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
 const getSetting = (k) => { const r = db.prepare('SELECT value FROM settings WHERE key=?').get(k); try { return r ? JSON.parse(r.value) : null; } catch { return null; } };
 const setSetting = (k, v) => db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(k, JSON.stringify(v));
@@ -367,6 +370,9 @@ async function openrouter(res, route, { method = 'POST', body, key, timeout, ret
   }
 }
 
+/* Costo addebitato da OpenRouter per la chiamata (usage.cost, in crediti ≈ dollari); null se non c'è */
+const costOf = (j) => (typeof j?.usage?.cost === 'number' && Number.isFinite(j.usage.cost) ? j.usage.cost : null);
+
 function sendError(res, e) {
   if (res.headersSent || res.writableEnded || res.destroyed) return;
   if (e instanceof UpstreamError) return res.status(e.status).json({ error: e.message });
@@ -412,7 +418,7 @@ app.get('/api/prompt-master', (_req, res) => {
 });
 
 /* Guida ai prompt (prompt-guide/cover-forge.md): sezioni "## nome", rilette quando il file cambia */
-const GUIDE_FILE = path.join(__dirname, 'prompt-guide', 'cover-forge.md');
+const GUIDE_FILE = path.join(process.env.GUIDE_DIR || path.join(__dirname, 'prompt-guide'), 'cover-forge.md');
 let guideCache = null;
 app.get('/api/prompt-guide', async (_req, res, next) => {
   try {
@@ -552,7 +558,7 @@ app.post('/api/craft', async (req, res) => {
       key, timeout: 90000, retries: 2,
       body: { model, messages, temperature: 0.9 }
     });
-    res.json({ content: j.choices?.[0]?.message?.content || '' });
+    res.json({ content: j.choices?.[0]?.message?.content || '', cost: costOf(j) });
   } catch (e) { sendError(res, e); }
 });
 
@@ -618,7 +624,7 @@ app.post('/api/generate', async (req, res) => {
     const msg = j.choices?.[0]?.message || {};
     const imgs = (msg.images || []).map(i => i.image_url?.url).filter(Boolean);
     if (!imgs.length) return res.status(422).json({ error: 'Il modello non ha restituito immagini.', text: msg.content });
-    res.json({ images: imgs, note: msg.content || '', aspect: aspectRejected ? 'rifiutato' : aspect ? 'inviato' : 'no' });
+    res.json({ images: imgs, note: msg.content || '', cost: costOf(j), aspect: aspectRejected ? 'rifiutato' : aspect ? 'inviato' : 'no' });
   } catch (e) { sendError(res, e); }
 });
 
@@ -684,7 +690,7 @@ function pruneHistory() {
 
 /* Elenco leggero: niente immagini, solo l'URL da cui caricarle */
 app.get('/api/history', (_req, res) => {
-  const rows = db.prepare(`SELECT id, ts, category, ratio, style, title, subtitle, brief, prompt, text_model, image_model, favorite, parent_id,
+  const rows = db.prepare(`SELECT id, ts, category, ratio, style, title, subtitle, brief, prompt, text_model, image_model, favorite, parent_id, cost,
       (image_file IS NOT NULL OR image IS NOT NULL) AS has_image
     FROM history ORDER BY ts DESC, id DESC LIMIT 200`).all();
   res.json(rows.map(({ has_image, ...r }) => ({ ...r, image_url: has_image ? `/api/history/${r.id}/image` : null })));
@@ -724,10 +730,11 @@ app.post('/api/history', async (req, res) => {
     }
 
     const parentId = Number.isInteger(b.parent_id) && db.prepare('SELECT 1 FROM history WHERE id=?').get(b.parent_id) ? b.parent_id : null;
-    const info = db.prepare(`INSERT INTO history (ts,category,ratio,style,title,subtitle,brief,prompt,image,image_file,text_model,image_model,parent_id)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    const cost = typeof b.cost === 'number' && Number.isFinite(b.cost) && b.cost >= 0 ? b.cost : null;
+    const info = db.prepare(`INSERT INTO history (ts,category,ratio,style,title,subtitle,brief,prompt,image,image_file,text_model,image_model,parent_id,cost)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
       Date.now(), b.category, clip(b.ratio, 20), clip(b.style, 40), clip(b.title, 500), clip(b.subtitle, 500),
-      clip(b.brief, 20000), clip(b.prompt, 20000), imageRemote, imageFile, clip(b.text_model, 200), clip(b.image_model, 200), parentId);
+      clip(b.brief, 20000), clip(b.prompt, 20000), imageRemote, imageFile, clip(b.text_model, 200), clip(b.image_model, 200), parentId, cost);
     pruneHistory();
     res.json({ id: info.lastInsertRowid });
   } catch (e) {
@@ -835,7 +842,7 @@ app.post('/api/style-profile/build', async (req, res) => {
     if (!text) throw new UpstreamError(502, 'Il modello non ha restituito un profilo.');
     const keys = Array.isArray(sources) ? sources.filter(k => typeof k === 'string' && /^[hr]\d+$/.test(k)).slice(0, STYLE_MAX_IMAGES) : [];
     setSetting('style_profile', { text, ts: Date.now(), sources: keys, auto: true, model });
-    res.json({ text });
+    res.json({ text, cost: costOf(j) });
   } catch (e) { sendError(res, e); }
 });
 

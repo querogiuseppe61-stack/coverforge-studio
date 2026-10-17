@@ -117,6 +117,7 @@ function activatable(el, label){
       if (h.ok) {
         MODE = 'proxy';
         if ((await h.json().catch(() => ({}))).hasServerKey) {
+          hasServerKey = true;
           $('#apiKey').placeholder = 'Facoltativa: il server ha già una chiave (.env)';
         }
       }
@@ -124,6 +125,8 @@ function activatable(el, label){
     $('#connBadge').textContent = MODE === 'proxy' ? '● proxy locale' : '● browser diretto';
     // le tre liste sono indipendenti: se una fallisce (es. OpenRouter irraggiungibile) le altre si caricano comunque
     const steps = [['modelli', () => loadModels(3)], ['cronologia', loadHistory], ['riferimenti', loadRefFiles], ['profilo di stile', loadStyle]];
+    // primo avvio (nessuna scelta salvata): procedura di benvenuto, che si aggiorna quando arrivano i modelli
+    if (!uiGet('welcomeDone') && !uiGet('textModel')) openWelcome();
     const results = await Promise.allSettled(steps.map(([, fn]) => fn()));
     results.forEach((r, i) => { if (r.status === 'rejected') log(`⚠ ${steps[i][0]}: ${r.reason.message}`); });
   })();
@@ -217,6 +220,74 @@ async function checkConnection(){
 }
 $('#btnCheck').onclick = checkConnection;
 
+/* ── Benvenuto ──
+   Al primo avvio (e dal pulsante «Guida iniziale»): chiave OpenRouter, verifica, combinazione di modelli. */
+let hasServerKey = false;
+
+function renderWelcomeModels(){
+  const box = $('#wModels');
+  if (!modelList) { box.textContent = MODE === 'proxy' || key() ? 'Carico l\'elenco dei modelli…' : 'L\'elenco dei modelli arriva dopo aver inserito la chiave.'; return; }
+  const rows = Object.entries(MODEL_PRESETS).map(([name, p], i) => {
+    const r = resolvePreset(name);
+    const lab = document.createElement('label');
+    const inp = document.createElement('input'); inp.type = 'radio'; inp.name = 'wPreset'; inp.value = name; inp.checked = i === 0;
+    inp.disabled = !r.text || !r.image;
+    const txt = document.createElement('div');
+    const b = document.createElement('b'); b.textContent = p.label;
+    const sm = document.createElement('small');
+    sm.textContent = r.text && r.image ? `testo: ${r.text} 👁 · immagini: ${r.image}` : 'nessun modello adatto disponibile ora';
+    txt.append(b, ` · ${p.desc}`, sm);
+    lab.append(inp, txt);
+    return lab;
+  });
+  const keep = document.createElement('label');
+  const ki = document.createElement('input'); ki.type = 'radio'; ki.name = 'wPreset'; ki.value = '';
+  const kt = document.createElement('div'); kt.append(Object.assign(document.createElement('b'), { textContent: 'Scelgo io' }), ' · lascia i modelli selezionati ora nelle impostazioni');
+  keep.append(ki, kt);
+  box.replaceChildren(...rows, keep);
+}
+
+function openWelcome(){
+  $('#wKey').value = $('#apiKey').value;
+  $('#wRemember').checked = $('#rememberKey').checked;
+  $('#wServerKey').classList.toggle('hidden', !hasServerKey);
+  $('#wCheckResult').replaceChildren();
+  renderWelcomeModels();
+  const d = $('#welcome');
+  if (!d.open) d.showModal();
+}
+
+function closeWelcome(apply){
+  if (apply) {
+    const name = document.querySelector('input[name="wPreset"]:checked')?.value;
+    const r = name ? resolvePreset(name) : null;
+    if (r?.text && r?.image) {
+      $('#textModel').value = r.text; $('#imageModel').value = r.image;
+      uiSet('textModel', r.text); uiSet('imageModel', r.image);
+      log(`Modelli «${MODEL_PRESETS[name].label}»: ${r.text} per il testo, ${r.image} per le immagini.`);
+    }
+    uiSet('welcomeDone', true);
+  }
+  $('#welcome').close();
+}
+
+/* la chiave scritta qui è la stessa del campo nelle impostazioni */
+$('#wKey').oninput = () => { $('#apiKey').value = $('#wKey').value.trim(); };
+$('#wKey').onchange = () => $('#apiKey').onchange?.();
+$('#wRemember').onchange = () => { $('#rememberKey').checked = $('#wRemember').checked; $('#rememberKey').onchange?.(); };
+$('#wCheck').onclick = async () => {
+  $('#apiKey').value = $('#wKey').value.trim(); $('#apiKey').onchange?.();
+  $('#wCheckResult').textContent = 'Verifico…';
+  await checkConnection();
+  $('#wCheckResult').replaceChildren(...[...$('#checkResult').children].map(n => n.cloneNode(true)));
+  if (!modelList) { await loadModels().catch(e => log('Modelli: ' + e.message)); }
+};
+$('#wDone').onclick = () => closeWelcome(true);
+$('#wLater').onclick = () => closeWelcome(false);
+$('#welcome').addEventListener('cancel', () => uiSet('welcomeDone', true));   // Esc: non riproporla a ogni avvio
+$('#btnWelcome').onclick = openWelcome;
+document.addEventListener('models-loaded', () => { if ($('#welcome').open) renderWelcomeModels(); });
+
 function fillRatios(){
   const r = $('#ratio'); r.innerHTML = '';
   CATS[cat].ratios.forEach(x => r.add(new Option(x, x)));
@@ -239,6 +310,7 @@ async function orFetch(route, body, method='POST'){
       const r = await fetch(route, { method, signal, headers:{'Content-Type':'application/json','x-or-key':key()}, body: body?JSON.stringify(body):undefined });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || `Errore del server locale (HTTP ${r.status}).`);
+      accountCost(route, j);
       return j;
     }
     const url = route.replace(/^\/api\/models/,`${OR_DIRECT}/models`).replace(/^\/api\/(craft|generate)/,`${OR_DIRECT}/chat/completions`);
@@ -268,10 +340,11 @@ async function orFetch(route, body, method='POST'){
     }
     const msg = j.choices?.[0]?.message;
     if (!msg) throw new Error('Risposta di OpenRouter non valida.');
-    if (route === '/api/craft') return { content: msg.content };
+    const cost = typeof j.usage?.cost === 'number' ? j.usage.cost : null;
+    if (route === '/api/craft') return accountCost(route, { content: msg.content, cost });
     const imgs = (msg.images||[]).map(i=>i.image_url?.url).filter(Boolean);
     if (!imgs.length) throw new Error('Nessuna immagine: scegli un modello grafico con output image');
-    return { images: imgs, aspect: aspectRejected ? 'rifiutato' : body.aspectRatio ? 'inviato' : 'no' };
+    return accountCost(route, { images: imgs, cost, aspect: aspectRejected ? 'rifiutato' : body.aspectRatio ? 'inviato' : 'no' });
   } catch (e) {
     if (e.name === 'AbortError') throw new Error('Operazione annullata.');
     if (e.name === 'TimeoutError') throw new Error('Tempo scaduto: nessuna risposta dal servizio.');
@@ -289,11 +362,68 @@ async function loadModels(retries = 0){
     if (retries > 0) { log(`Modelli non disponibili (${e.message}) — riprovo fra 15 secondi (puoi anche usare «Verifica connessione»).`); setTimeout(() => loadModels(retries - 1).catch(() => {}), 15000); return; }
     throw e;
   }
-  const defT = ['anthropic/claude-sonnet-4.5','openai/gpt-4o','google/gemini-2.5-flash'];
-  const defI = ['google/gemini-2.5-flash-image-preview','openai/gpt-image-1'];
-  fill('#textModel',  m.text,  defT);
-  fill('#imageModel', m.image, defI);
+  // predefiniti: i modelli della combinazione «Economica» presenti ora nell'elenco (niente id scritti nel codice che invecchiano)
+  modelList = m;
+  const eco = resolvePreset('economica', m);
+  fill('#textModel',  m.text,  [eco.text]);
+  fill('#imageModel', m.image, [eco.image]);
   log(`Pronto: ${m.text.length} testo, ${m.image.length} immagine.`);
+  document.dispatchEvent(new Event('models-loaded'));
+}
+
+/* ── Combinazioni di modelli consigliate ──
+   Ogni combinazione è un elenco di schemi in ordine di preferenza; per ogni schema si prende il modello
+   più recente fra quelli disponibili (numero di versione più alto, a parità la versione non «preview»).
+   Il modello di testo deve avere la vista (👁), che serve a guardare riferimenti e immagini da modificare. */
+let modelList = null;
+const MODEL_PRESETS = {
+  economica: { label: 'Economica', desc: 'modelli veloci e a basso costo: per provare e per l\'uso di tutti i giorni',
+    text: [/^google\/gemini-[\d.]+-flash$/, /^google\/gemini-[\d.]+-flash(?!.*(image|lite))/, /^openai\/gpt-[\d.o]+-mini$/, /^anthropic\/claude-.*haiku/],
+    image: [/^google\/gemini-[\d.]+-flash-image/, /^google\/gemini-.*flash.*image/] },
+  qualita: { label: 'Qualità', desc: 'i modelli più capaci: prompt più curati e immagini migliori, a un costo più alto',
+    text: [/^anthropic\/claude-(sonnet|opus)-[\d.]+$/, /^anthropic\/claude-[\d.]+-(sonnet|opus)/, /^openai\/gpt-5(\.\d+)?$/, /^google\/gemini-[\d.]+-pro$/],
+    image: [/^google\/gemini-[\d.]+-pro-image/, /^openai\/gpt-[\w.-]*image/, /^google\/gemini-.*image/] }
+};
+const modelVersion = (id) => parseFloat((/(\d+(?:\.\d+)?)/.exec(id.split('/')[1] || '') || [])[1]) || 0;
+function pickModel(list, patterns, needVision){
+  const pool = list.filter(x => !x.id.includes(':') && (!needVision || x.vision));
+  for (const re of patterns) {
+    const hits = pool.filter(x => re.test(x.id))
+      .sort((a, b) => modelVersion(b.id) - modelVersion(a.id) || /preview/.test(a.id) - /preview/.test(b.id));
+    if (hits.length) return hits[0].id;
+  }
+  return null;
+}
+function resolvePreset(name, m = modelList){
+  const p = MODEL_PRESETS[name];
+  if (!p || !m) return { text: null, image: null };
+  return { text: pickModel(m.text, p.text, true), image: pickModel(m.image, p.image, false) };
+}
+
+/* ── Costi ──
+   OpenRouter riporta in ogni risposta quanto ha addebitato (usage.cost, in crediti ≈ dollari).
+   Totale della sessione nel badge 💳; il costo accumulato dall'ultima immagine (prompt, idee, generazione)
+   si salva con l'immagine in cronologia. Il profilo di stile non si attribuisce a nessuna immagine. */
+const COST_LABEL = { '/api/craft': 'testo', '/api/generate': 'immagine', '/api/style-profile/build': 'profilo di stile' };
+const costState = { session: 0, pending: 0, pendingKnown: false, unknown: 0 };
+const fmtCost = (n) => '$' + (n === 0 ? '0' : n < 0.01 ? n.toFixed(4) : n < 1 ? n.toFixed(3) : n.toFixed(2));
+
+function accountCost(route, j){
+  if (!COST_LABEL[route] || !j) return j;
+  if (typeof j.cost === 'number') {
+    costState.session += j.cost;
+    if (route !== '/api/style-profile/build') { costState.pending += j.cost; costState.pendingKnown = true; }
+    log(`💳 ${COST_LABEL[route]}: ${fmtCost(j.cost)} · sessione ${fmtCost(costState.session)}`);
+  } else costState.unknown++;
+  $('#costBadge').textContent = `💳 ${fmtCost(costState.session)}${costState.unknown ? ' +?' : ''}`;
+  $('#costBadge').title = `Spesa su OpenRouter in questa sessione${costState.unknown ? ` (${costState.unknown} operazioni senza costo indicato da OpenRouter)` : ''}`;
+  return j;
+}
+/* Costo da salvare con l'immagine appena arrivata, poi si riparte da zero */
+function takePendingCost(){
+  const c = costState.pendingKnown ? costState.pending : null;
+  costState.pending = 0; costState.pendingKnown = false;
+  return c;
 }
 /* id modello di testo → accetta immagini in ingresso? (campo "vision" del server) */
 const MODEL_VISION = new Map();
@@ -1103,7 +1233,7 @@ async function loadHistory(){
       const meta = document.createElement('div'); meta.className = 'meta';
       const cat = document.createElement('b'); cat.textContent = row.category;
       meta.append(cat,
-        document.createTextNode(` · ${row.ratio||''}${row.style ? ' · ' + row.style : ''}${row.parent_id ? ' · ✎ versione' : ''}`),
+        document.createTextNode(` · ${row.ratio||''}${row.style ? ' · ' + row.style : ''}${row.parent_id ? ' · ✎ versione' : ''}${typeof row.cost === 'number' ? ' · ' + fmtCost(row.cost) : ''}`),
         document.createElement('br'),
         document.createTextNode(row.brief || row.prompt || ''));
       meta.onclick = () => restoreRow(row);
@@ -1325,6 +1455,7 @@ function addToGallery(url, meta){
 }
 
 async function saveToHistory(url, meta){
+  const cost = takePendingCost();
   if (MODE !== 'proxy') return;
   try {
     const r = await fetch('/api/history', { method:'POST', headers:{'Content-Type':'application/json'},
@@ -1333,7 +1464,8 @@ async function saveToHistory(url, meta){
         title: $('#titleTxt').value, subtitle: $('#subTxt').value,
         brief: $('#brief').value, prompt: $('#promptOut').value, image: url,
         text_model: $('#textModel').value, image_model: $('#imageModel').value,
-        parent_id: meta?.parent?.meta?.historyId ?? null
+        parent_id: meta?.parent?.meta?.historyId ?? null,
+        cost
       })});
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || r.status);
