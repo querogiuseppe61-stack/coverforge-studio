@@ -34,8 +34,8 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -47,7 +47,7 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       # prova del pacchetto: il server parte con l'eseguibile dell'app e il database funziona
       - run: node scripts/smoke-packaged.js
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: coverforge-${{ runner.os }}
           path: |
@@ -63,7 +63,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # la versione deve essere quella del programma: v + "version" di package.json
       - name: Controllo della versione
         env:
@@ -74,12 +74,13 @@ jobs:
             echo "::error::La versione indicata ($VERSIONE) non corrisponde a package.json ($atteso)."
             exit 1
           fi
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: pacchetti
           merge-multiple: true
-      # bozza: il tag viene creato da GitHub quando la release viene pubblicata, sul commit di questa esecuzione
-      - uses: softprops/action-gh-release@v2
+      # bozza: il tag viene creato da GitHub quando la release viene pubblicata, sul commit di questa esecuzione.
+      # Azione di terzi con permesso di scrittura: fissata per commit (v3.0.3), non per etichetta spostabile
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: ${{ inputs.versione }}
           target_commitish: ${{ github.sha }}

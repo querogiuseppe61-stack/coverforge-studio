@@ -275,7 +275,7 @@ Dal 16 ottobre il codice è cambiato molto: tipo di progetto Blog, «Il mio stil
 | N-02 | Bassa | Zona segnata su un'immagine salvata come link esterno (solo vecchie voci della cronologia): la tela non si può leggere e l'errore era incomprensibile. | Risolto: messaggio chiaro con la soluzione («scaricala e riaprila con Carica immagine»), come già per *Allarga al formato*. |
 | N-03 | Bassa | Residuo di B-03: il server accettava la chiave API anche nel corpo delle richieste (`/api/craft`, `/api/generate`, `/api/style-profile/build`), benché l'interfaccia la mandi solo nell'intestazione. | Risolto: solo intestazione `x-or-key`; nuovo test. |
 | N-04 | Info | `npm audit`: 10 segnalazioni moderate. Le 7 nuove vengono da `electron-builder` (`roarr`/`global-agent` → `sprintf-js`, stesso avviso GHSA-hp3w-g68c-fv3c), strumento usato solo per costruire i pacchetti e non incluso nell'app. `npm audit --omit=dev` dà le stesse 3 di M-16. | Non sfruttabile; da riguardare quando esce una versione corretta. |
-| N-05 | Bassa | I workflow usano le azioni di GitHub per versione principale (`@v4`) e non per commit; GitHub avvisa che le versioni attuali girano su Node 20, deprecato. | Aperto: aggiornare le azioni e valutare il fissaggio per commit. |
+| N-05 | Bassa | I workflow usano le azioni di GitHub per versione principale (`@v4`) e non per commit; GitHub avvisa che le versioni attuali girano su Node 20, deprecato. | Risolto: azioni aggiornate a versioni su Node 24 (checkout v7, setup-node v7, upload-artifact v7, download-artifact v8, action-gh-release v3); l'unica azione di terzi, che scrive la release, è fissata per commit. Le azioni ufficiali di GitHub restano per versione principale. |
 | N-06 | Info | Le versioni collegate si ricostruiscono dalle 200 voci più recenti caricate in cronologia: una versione la cui voce di partenza è più vecchia si apre senza confronto. | Accettato: la voce resta, manca solo il collegamento. |
 | N-07 | Info | Pacchetti non firmati: Windows e macOS mostrano un avviso al primo avvio. | Accettato e documentato nel README; la firma richiede certificati a pagamento. |
 
@@ -287,4 +287,4 @@ Nessun problema di sicurezza nel codice nuovo: gli endpoint aggiunti (preferite,
 
 Verifica: `npm test` (25 test, di cui 8 nell'interfaccia in Chromium) passa; prova a mano in Chromium di idee, mascherina, esportazione PNG e SVG, preferita, ripristino dalla cronologia e modalità diretta da `file://`, senza errori nella pagina.
 
-Voci aperte: N-05.
+Voci aperte: nessuna.
