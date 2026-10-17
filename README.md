@@ -68,11 +68,12 @@ La finestra Electron è una sola alla volta, non apre mai pagine esterne al suo 
 ### Icona nel menu / doppio clic
 
 ```bash
-bash install-desktop.sh          # rigenera coverforge-studio.desktop con il percorso attuale
-bash install-desktop.sh --menu   # in più lo aggiunge al menu delle applicazioni
+bash install-desktop.sh                    # rigenera coverforge-studio.desktop con il percorso attuale
+bash install-desktop.sh --menu             # in più lo aggiunge al menu delle applicazioni
+bash install-desktop.sh --menu --desktop   # menu e collegamento sulla scrivania
 ```
 
-Rilancialo se sposti la cartella del progetto.
+Rilancialo se sposti la cartella del progetto o dopo un aggiornamento che cambia l'icona. Se sulla scrivania l'icona appare grigia: clic destro → *Consenti l'avvio*.
 
 ## Costi
 
