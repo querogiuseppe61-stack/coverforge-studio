@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════
    M A S C H E R I N A  —  blocchi di testo sopra l'immagine
-   Caricato PRIMA di app.js: qui solo dichiarazioni (usa $, log, lastImage, cat di app.js
-   solo dentro le funzioni). app.js chiama initMask() all'avvio.
+   Caricato PRIMA degli script di public/js/: qui solo dichiarazioni (usa $, log, lastImage, cat
+   di quegli script solo dentro le funzioni). public/js/main.js chiama initMask() all'avvio.
    ═══════════════════════════════════════════════════ */
 
 /* ── Geometria condivisa tra anteprima (CSS), export PNG (canvas) ed export SVG ──
@@ -888,7 +888,7 @@ function maskUseOwnImage(file) {
   fr.readAsDataURL(file);
 }
 
-/* ── Avvio (chiamata da app.js) ── */
+/* ── Avvio (chiamata da public/js/main.js) ── */
 function initMask() {
   $('#mcFont').replaceChildren(...MASK_FONTS.map(f => { const o = new Option(f, f); o.style.fontFamily = `'${f}'`; return o; }));
   maskFillPresetSelect('custom');

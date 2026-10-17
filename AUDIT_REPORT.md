@@ -245,3 +245,46 @@ Non misurato: quanto il modello rispetti davvero la guida (serve provarla con un
 
 **Istruzione sui testi allegati per tipo di progetto (2026-10-16).** La frase che dice al modello come leggere i testi di riferimento era unica e narrativa ("personaggi, ambientazione, atmosfera e simboli"). Ora dipende dal tipo di progetto (libro, album, logo, icona, header) ed è definita in `REF_TEXT_HINT` in `public/app.js`, non nella guida, quindi vale con qualunque guida (CoverForge, Prompt Master, Nessuna) e il confronto fra le tre resta pulito. Provata su un modello simulato: la frase giusta compare per ogni tipo, sia per il prompt sia per le idee, non compare senza riferimenti spuntati, e la vecchia frase non resta. Da valutare con testi veri (brief di marca, testi di canzoni).
 
+
+---
+
+## 8. Ricontrollo del 2026-10-17
+
+Dal 16 ottobre il codice è cambiato molto: tipo di progetto Blog, «Il mio stile», modifica delle immagini (LLM, modifiche rapide, zona, nuovo formato, versioni, prima/dopo), parametro di formato, primo avvio guidato, costi, pacchetti di installazione, test automatici. Il ricontrollo ha due parti: verificare che le correzioni della sezione 7 reggano sul codice attuale, e rivedere il codice nuovo.
+
+### 8.1 Correzioni della sezione 7: ancora valide
+
+| Voci | Verifica sul codice attuale |
+|---|---|
+| C-01 | `.env.example` senza chiave; `.env` in `.gitignore`. [F] |
+| A-01, B-17 | Server su `127.0.0.1`, controllo di Host e Origin, CSP, limiti JSON per rotta (anche la nuova `/api/style-profile/build`, 20 MB). Coperto da un test automatico. [F] |
+| A-02, A-03, M-01 | Riferimenti come data URL lato server; testo con estratto inizio/metà/fine. Coperti da test. [F] |
+| A-04 | L'unico `innerHTML` con dati interpolati (elenco dei riferimenti) usa `escapeHtml`; tutto il codice nuovo (benvenuto, costi, versioni, confronto) costruisce il DOM con `textContent`. [F] |
+| A-05, M-09, B-11 | Immagini su disco, elenco leggero, potatura a 500 voci, nessun duplicato al ripristino. La potatura ora scollega anche le versioni. Coperto da test. [F] |
+| M-05, M-06, B-12 | Errori sempre in JSON, controllo del contenuto dei file, niente SVG in cronologia. Coperti da test. [F] |
+| M-13, B-07 | Protezioni di Electron invariate; nell'app installata il server parte con Electron in modalità Node. [F] |
+| M-14 | Nessun servizio esterno oltre a OpenRouter nel codice dell'interfaccia. [F] |
+| M-16 | Stesse 3 segnalazioni moderate di `mammoth` → `argparse` → `sprintf-js`, non sfruttabili (vedi sezione 7). [F] |
+| B-13 | I modelli predefiniti non sono più scritti nel codice: vengono scelti dall'elenco attuale di OpenRouter (combinazione «Economica»). [F] |
+
+### 8.2 Codice nuovo: problemi trovati
+
+| ID | Gravità | Problema | Stato |
+|---|---|---|---|
+| N-01 | Bassa | App installata: la cartella dati dell'utente veniva data per esistente prima di aprire il log e avviare il server. | Risolto: `electron.js` la crea prima. |
+| N-02 | Bassa | Zona segnata su un'immagine salvata come link esterno (solo vecchie voci della cronologia): la tela non si può leggere e l'errore era incomprensibile. | Risolto: messaggio chiaro con la soluzione («scaricala e riaprila con Carica immagine»), come già per *Allarga al formato*. |
+| N-03 | Bassa | Residuo di B-03: il server accettava la chiave API anche nel corpo delle richieste (`/api/craft`, `/api/generate`, `/api/style-profile/build`), benché l'interfaccia la mandi solo nell'intestazione. | Risolto: solo intestazione `x-or-key`; nuovo test. |
+| N-04 | Info | `npm audit`: 10 segnalazioni moderate. Le 7 nuove vengono da `electron-builder` (`roarr`/`global-agent` → `sprintf-js`, stesso avviso GHSA-hp3w-g68c-fv3c), strumento usato solo per costruire i pacchetti e non incluso nell'app. `npm audit --omit=dev` dà le stesse 3 di M-16. | Non sfruttabile; da riguardare quando esce una versione corretta. |
+| N-05 | Bassa | I workflow usano le azioni di GitHub per versione principale (`@v4`) e non per commit; GitHub avvisa che le versioni attuali girano su Node 20, deprecato. | Aperto: aggiornare le azioni e valutare il fissaggio per commit. |
+| N-06 | Info | Le versioni collegate si ricostruiscono dalle 200 voci più recenti caricate in cronologia: una versione la cui voce di partenza è più vecchia si apre senza confronto. | Accettato: la voce resta, manca solo il collegamento. |
+| N-07 | Info | Pacchetti non firmati: Windows e macOS mostrano un avviso al primo avvio. | Accettato e documentato nel README; la firma richiede certificati a pagamento. |
+
+Nessun problema di sicurezza nel codice nuovo: gli endpoint aggiunti (preferite, esempi di stile, profilo, versioni, costi) validano gli input (id numerici, chiavi delle fonti con formato fisso, testi troncati, immagini solo raster entro i limiti) e sono coperti dagli stessi controlli di Host e Origin; il workflow di release riceve la versione tramite variabile d'ambiente, non interpolata nello script.
+
+### 8.3 Struttura del codice
+
+`public/app.js` (circa 1.490 righe) è stato diviso in otto script in `public/js/`, caricati in quest'ordine dopo `mask.js` e `trace.js`: `core` (costanti, preferenze, chiamate a OpenRouter, registro), `connection` (verifica, benvenuto, modelli, costi), `refs` (riferimenti), `prompt` (guida, istruzioni, idee, generazione), `edit` (modifica, zona, confronto, nuovo formato), `result` (esportazione, cronologia, riquadro del risultato), `style` (il mio stile), `main` (avvio, per ultimo). Lo spostamento è meccanico: le righe di codice coincidono con l'originale (verificato confrontandole). `npm run check` usa ora `scripts/check-public.js`, che controlla la sintassi di ogni script dell'interfaccia e che `index.html` li carichi tutti.
+
+Verifica: `npm test` (25 test, di cui 8 nell'interfaccia in Chromium) passa; prova a mano in Chromium di idee, mascherina, esportazione PNG e SVG, preferita, ripristino dalla cronologia e modalità diretta da `file://`, senza errori nella pagina.
+
+Voci aperte: N-05.

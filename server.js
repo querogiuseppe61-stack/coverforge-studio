@@ -551,7 +551,7 @@ function sanitizeMessages(messages) {
 
 app.post('/api/craft', async (req, res) => {
   const { model } = req.body;
-  const key = req.headers['x-or-key'] || req.body.key;
+  const key = req.headers['x-or-key'];
   try {
     const messages = sanitizeMessages(req.body.messages);
     const j = await openrouter(res, '/chat/completions', {
@@ -596,7 +596,7 @@ const ASPECT_RATIOS = ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', 
 app.post('/api/generate', async (req, res) => {
   const { model, prompt, referenceImages = [] } = req.body;
   const aspect = ASPECT_RATIOS.includes(req.body.aspectRatio) ? req.body.aspectRatio : null;
-  const key = req.headers['x-or-key'] || req.body.key;
+  const key = req.headers['x-or-key'];
   let resolved;
   try {
     if (!Array.isArray(referenceImages)) throw new Error('referenceImages deve essere un elenco.');
@@ -819,7 +819,7 @@ Rispondi solo con le righe del profilo, senza introduzioni né markdown.`;
 
 app.post('/api/style-profile/build', async (req, res) => {
   const { model, images, sources } = req.body || {};
-  const key = req.headers['x-or-key'] || req.body?.key;
+  const key = req.headers['x-or-key'];
   try {
     if (typeof model !== 'string' || !model) throw new UpstreamError(400, 'Modello di testo mancante.');
     if (!Array.isArray(images) || images.length < STYLE_MIN_IMAGES || images.length > STYLE_MAX_IMAGES) {

@@ -189,3 +189,15 @@ test('endpoint sconosciuti e JSON malformato rispondono in JSON', async () => {
   assert.equal(bad.status, 400);
   assert.ok((await bad.json()).error);
 });
+
+test('la chiave API si accetta solo nell\'intestazione, non nel corpo', async () => {
+  const bare = await startServer();   // server senza chiave in .env
+  try {
+    const call = (headers, body) => fetch(bare.url + '/api/craft', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ model: 'x', messages: [{ role: 'user', content: 'u' }], ...body })
+    });
+    assert.equal((await call({}, { key: 'sk-nel-corpo' })).status, 401);
+    assert.equal((await call({ 'x-or-key': 'sk-intestazione' }, {})).status, 200);
+  } finally { await bare.stop(); }
+});
