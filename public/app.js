@@ -3,6 +3,7 @@ const $$ = s => document.querySelectorAll(s);
 const OR_DIRECT = 'https://openrouter.ai/api/v1';
 let MODE = 'proxy';
 let lastImage = null, lastMeta = null;
+let lastHistoryId = null;   // riga di cronologia dell'immagine mostrata (per ⭐ Preferita)
 
 const CATS = {
   libro:   { label:'📕 Libro',  ratios:['2:3','16:9','1:1'], hint:'book cover' },
@@ -69,6 +70,8 @@ function activatable(el, label){
   $('#promptGuide').value = ['cover', 'pm', 'none'].includes(guide) ? guide : 'cover';
   $('#promptGuide').onchange = e => uiSet('guide', e.target.value);
   $('#approveIdea').checked = uiGet('approve') === true;
+  $('#useStyle').checked = uiGet('useStyle') === true;
+  $('#useStyle').onchange = e => { uiSet('useStyle', e.target.checked); if (e.target.checked && !styleState.text) log('⚠ Il profilo di stile è vuoto: aggiornalo o scrivilo prima di usarlo.'); };
   const savedLimit = String(uiGet('refLimit') ?? '');
   if ([...$('#refLimit').options].some(o => o.value === savedLimit)) $('#refLimit').value = savedLimit;
   $('#refLimit').onchange = e => uiSet('refLimit', e.target.value);
@@ -112,7 +115,7 @@ function activatable(el, label){
     } catch { MODE = 'direct'; }
     $('#connBadge').textContent = MODE === 'proxy' ? '● proxy locale' : '● browser diretto';
     // le tre liste sono indipendenti: se una fallisce (es. OpenRouter irraggiungibile) le altre si caricano comunque
-    const steps = [['modelli', () => loadModels(3)], ['cronologia', loadHistory], ['riferimenti', loadRefFiles]];
+    const steps = [['modelli', () => loadModels(3)], ['cronologia', loadHistory], ['riferimenti', loadRefFiles], ['profilo di stile', loadStyle]];
     const results = await Promise.allSettled(steps.map(([, fn]) => fn()));
     results.forEach((r, i) => { if (r.status === 'rejected') log(`⚠ ${steps[i][0]}: ${r.reason.message}`); });
   })();
@@ -217,7 +220,7 @@ const key = () => $('#apiKey').value.trim();
 /* Pulsante Annulla: l'operazione in corso (busy) ha un AbortController; ogni richiesta ha inoltre un timeout
    un po' più lungo di quello del server, così di solito arriva prima il messaggio del server. */
 let activeAbort = null;
-const CLIENT_TIMEOUT = { models: 30000, craft: 120000, generate: 210000 };
+const CLIENT_TIMEOUT = { models: 30000, craft: 120000, generate: 210000, 'style-profile/build': 150000 };
 
 async function orFetch(route, body, method='POST'){
   const signals = [AbortSignal.timeout(CLIENT_TIMEOUT[route.replace('/api/', '')] || 120000)];
@@ -304,11 +307,14 @@ async function loadRefFiles(){
         <label class="ref-toggle" title="Includi come riferimento">
           <input type="checkbox" aria-label="Usa come riferimento: ${escapeHtml(row.original_name)}" data-id="${row.id}" data-type="${row.file_type}" data-stored="${escapeHtml(row.stored_name)}" data-name="${escapeHtml(row.original_name)}">
         </label>
+        ${row.file_type === 'image' ? `<button class="ref-style${row.style_example ? ' on' : ''}" aria-pressed="${row.style_example ? 'true' : 'false'}" title="Esempio del mio stile: entra nell'archivio da cui si ricava il profilo" aria-label="Esempio di stile: ${escapeHtml(row.original_name)}">🎨</button>` : ''}
         <button class="ref-del" data-id="${row.id}" title="Rimuovi" aria-label="Rimuovi ${escapeHtml(row.original_name)}">✕</button>
       `;
+      const st = d.querySelector('.ref-style');
+      if (st) st.onclick = () => toggleMark(st, `/api/ref-files/${row.id}/style`, 'style');
       d.querySelector('.ref-del').onclick = async () => {
         await fetch('/api/ref-files/'+row.id, {method:'DELETE'});
-        loadRefFiles();
+        loadRefFiles(); loadStyle();
       };
       list.appendChild(d);
     });
@@ -372,16 +378,20 @@ async function buildRefContext(){
 async function buildRefImageParts(){
   const parts = [];
   for (const url of getSelectedImageUrls().slice(0, 3)) {
-    try {
-      const img = await maskLoadImage(url);
-      const k = Math.min(1, 768 / Math.max(img.naturalWidth, img.naturalHeight));
-      const c = document.createElement('canvas');
-      c.width = Math.max(1, Math.round(img.naturalWidth * k)); c.height = Math.max(1, Math.round(img.naturalHeight * k));
-      const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
-      parts.push({ type: 'image_url', image_url: { url: c.toDataURL('image/jpeg', 0.8) } });
-    } catch { log(`⚠ Immagine di riferimento non leggibile: ${url.split('/').pop()}`); }
+    try { parts.push({ type: 'image_url', image_url: { url: await downscaleJpeg(url, 768) } }); }
+    catch { log(`⚠ Immagine di riferimento non leggibile: ${url.split('/').pop()}`); }
   }
   return parts;
+}
+
+/* Immagine ridotta (lato massimo `side` px) in JPEG data URL, su fondo bianco per le trasparenze */
+async function downscaleJpeg(url, side){
+  const img = await maskLoadImage(url);
+  const k = Math.min(1, side / Math.max(img.naturalWidth, img.naturalHeight));
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(img.naturalWidth * k)); c.height = Math.max(1, Math.round(img.naturalHeight * k));
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.8);
 }
 
 /* File upload via drag & drop + button */
@@ -464,11 +474,24 @@ L'immagine deve rendere insieme tutte e tre le cose: chi la vede, prima di legge
 Le indicazioni dell'utente nel brief si rispettano (elementi richiesti, stile, colori, vincoli), ma restano dentro il tono e lo spirito dell'articolo, salvo che l'utente chieda espressamente un registro diverso. Non citare frasi dell'articolo e non scrivere il titolo nell'immagine se non è richiesto.`
 };
 
+/* Profilo di stile dell'utente: orienta il gusto, ma viene dopo il brief e lo stile scelto nel menu */
+const USER_STYLE_HINT = {
+  blog: "Per l'immagine di un articolo: tono e spirito dell'articolo decidono l'atmosfera, il profilo decide il trattamento grafico (tecnica, palette di base, composizione).",
+  logo: "Per un logo applica del profilo solo palette e gusto generale: la semplicità richiesta resta la regola.",
+  icona: "Per un'icona applica del profilo solo palette e gusto generale: la semplicità richiesta resta la regola."
+};
+function userStyleBlock(profile){
+  if (!profile) return '';
+  return `\n\n=== STILE PREFERITO DELL'UTENTE ===\n${profile}\n=== FINE STILE ===
+È il gusto grafico dell'utente, ricavato dalle immagini che ha scelto. Orienta tecnica, palette, luce, composizione e trattamento verso questo stile.
+Priorità: le richieste esplicite del brief e lo stile artistico obbligatorio, se indicato, vengono prima; il profilo decide ciò che il brief non decide. È uno stile, non un tema: non riprendere i soggetti delle immagini da cui è stato ricavato.${USER_STYLE_HINT[cat] ? ' ' + USER_STYLE_HINT[cat] : ''}`;
+}
+
 /* images: { n, seen } — quante immagini sono allegate e se il modello di testo le vede */
-function sysPrompt(mode, refContext, guide, images, concept = false){
+function sysPrompt(mode, refContext, guide, images, concept = false, userStyle = ''){
   const c = CATS[cat], ratio = $('#ratio').value;
   const styleVal = $('#style').value;
-  const styleHint = styleVal ? `\nStile artistico OBBLIGATORIO: ${STYLES[styleVal]}.` : '';
+  const styleHint = (styleVal ? `\nStile artistico OBBLIGATORIO: ${STYLES[styleVal]}.` : '') + userStyleBlock(userStyle);
   const ctx = buildContextBlock(refContext);
   const guideBlock = guide ? `\n\n=== GUIDA PER IL PROMPT ===\n${guide}\n=== FINE GUIDA ===\n` : '';
   const imgNote = !images.n ? ''
@@ -516,13 +539,16 @@ async function buildTextRequest(mode, userText){
   const parts = seen ? await buildRefImageParts() : [];
   const images = { n: nImg, seen: parts.length > 0 };
   const useConcept = mode === 'prompt' && $('#promptGuide').value === 'cover' && Boolean(guide);
-  const system = { role: 'system', content: sysPrompt(mode, refs.context, guide, images, useConcept) };
+  const userStyle = $('#useStyle').checked && MODE === 'proxy' ? styleState.text.trim() : '';
+  if ($('#useStyle').checked && !userStyle) log('⚠ «Usa il mio stile» è attivo ma il profilo è vuoto: proseguo senza.');
+  const system = { role: 'system', content: sysPrompt(mode, refs.context, guide, images, useConcept, userStyle) };
   const user = parts.length ? { role: 'user', content: [{ type: 'text', text: userText }, ...parts] } : { role: 'user', content: userText };
   const notes = [];
   if (cat === 'blog' && !refs.used.length) log('⚠ Blog: nessun articolo spuntato nei Riferimenti. Allega il testo dell\'articolo (txt, md, PDF, DOCX) e spuntalo: il prompt ne segue argomento, tono e spirito. Proseguo solo con il brief.');
   if (refs.used.length) notes.push(`testi: ${refs.used.map(u => `${u.name} (${nf(u.chars)}${u.sampled ? ' su ' + nf(u.total) : ''} car.)`).join(', ')}`);
   if (nImg) notes.push(images.seen ? `${parts.length} immagini viste dal modello di testo` : `${nImg} immagini solo per il generatore (il modello di testo non ha la vista)`);
   if (guide) notes.push(`guida «${$('#promptGuide').selectedOptions[0].textContent}»`);
+  if (userStyle) notes.push('il mio stile');
   if (notes.length) log('Uso nel prompt → ' + notes.join(' · '));
   return [system, user];
 }
@@ -745,14 +771,19 @@ async function loadHistory(){
         document.createTextNode(row.brief || row.prompt || ''));
       meta.onclick = () => restoreRow(row);
       activatable(meta, `Ripristina: ${row.category} ${row.ratio || ''} ${(row.brief || row.prompt || '').slice(0, 60)}`.trim());
+      const fav = document.createElement('button');
+      fav.className = 'fav' + (row.favorite ? ' on' : ''); fav.textContent = '⭐';
+      fav.title = 'Preferita: entra nell\'archivio del tuo stile'; fav.setAttribute('aria-label', 'Preferita');
+      fav.setAttribute('aria-pressed', String(Boolean(row.favorite)));
+      fav.onclick = (e) => { e.stopPropagation(); toggleMark(fav, `/api/history/${row.id}/favorite`, 'favorite', row.id); };
       const del = document.createElement('button');
       del.textContent = '✕'; del.title = 'Elimina'; del.setAttribute('aria-label', 'Elimina dalla cronologia');
       del.onclick = async (e) => {
         e.stopPropagation();
         await fetch('/api/history/'+row.id, {method:'DELETE'});
-        loadHistory();
+        loadHistory(); loadStyle();
       };
-      d.append(meta, del);
+      d.append(meta, fav, del);
       h.appendChild(d);
     });
   } catch(e){ log('Cronologia: '+e.message); }
@@ -764,14 +795,110 @@ function restoreRow(row){
   $('#style').value = row.style || '';
   $('#brief').value = row.brief || '';
   $('#promptOut').value = row.prompt || '';
-  if (row.image_url) renderImage(row.image_url, { prompt: row.prompt });   // niente nuovo salvataggio
+  if (row.image_url) renderImage(row.image_url, { prompt: row.prompt, historyId: row.id, favorite: Boolean(row.favorite) });   // niente nuovo salvataggio
   log('Ripristinato dalla cronologia');
 }
 $('#btnHistReload').onclick = loadHistory;
 $('#btnHistClear').onclick = async () => {
   if (!confirm('Svuotare tutta la cronologia?')) return;
   await fetch('/api/history', {method:'DELETE'});
-  loadHistory();
+  loadHistory(); loadStyle();
+};
+
+/* ── Il mio stile ──
+   Archivio: ⭐ in cronologia e 🎨 sulle immagini allegate. «Aggiorna profilo» manda le immagini, ridotte,
+   a un modello con la vista che ne scrive una descrizione; a ogni prompt viaggia solo quel testo. */
+let styleState = { text: '', ts: null, sources: [], archive: { images: [], examples: 0, favorites: 0 } };
+
+async function loadStyle(){
+  if (MODE !== 'proxy') { $('#styleStatus').textContent = 'Il profilo di stile richiede il server locale.'; return; }
+  const r = await fetch('/api/style-profile');
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  styleState = await r.json();
+  if (!$('#btnStyleSave').disabled) return renderStyleStatus();   // modifiche non salvate: non sovrascriverle
+  $('#styleProfile').value = styleState.text || '';
+  renderStyleStatus();
+}
+
+function renderStyleStatus(){
+  const a = styleState.archive, n = a.examples + a.favorites;
+  const el = $('#styleStatus'); el.replaceChildren();
+  el.append(`Archivio: ${a.favorites} preferite ⭐ · ${a.examples} esempi 🎨`);
+  if (styleState.ts) el.append(` · profilo del ${new Date(styleState.ts).toLocaleDateString('it-IT')}${styleState.auto ? '' : ' (scritto a mano)'}`);
+  const used = new Set(styleState.sources || []), now = a.images.map(i => i.key);
+  let warn = '';
+  if (n < 3) warn = `Servono almeno 3 immagini per ricavare il profilo (ne mancano ${3 - n}).`;
+  else if (styleState.auto && (now.length !== used.size || now.some(k => !used.has(k)))) warn = 'L\'archivio è cambiato dall\'ultimo profilo: puoi aggiornarlo.';
+  if (warn) { const w = document.createElement('div'); w.className = 'warn'; w.textContent = warn; el.append(w); }
+}
+
+/* ⭐ / 🎨: aggiorna subito il pulsante, poi il server; in caso di errore torna indietro */
+async function toggleMark(btn, url, field, historyId){
+  const on = !btn.classList.contains('on');
+  btn.classList.toggle('on', on); btn.setAttribute('aria-pressed', String(on));
+  try {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [field]: on }) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
+    if (historyId != null && historyId === lastHistoryId) { setFavButton(on); if (lastMeta) lastMeta.favorite = on; }
+    await loadStyle();
+  } catch (e) {
+    btn.classList.toggle('on', !on); btn.setAttribute('aria-pressed', String(!on));
+    log('Archivio di stile: ' + e.message);
+  }
+}
+
+function setFavButton(on){
+  const b = $('#btnFav');
+  b.disabled = lastHistoryId == null;
+  b.classList.toggle('on', Boolean(on)); b.setAttribute('aria-pressed', String(Boolean(on)));
+  b.textContent = on ? '⭐ Preferita' : '☆ Preferita';
+}
+
+$('#btnFav').onclick = async () => {
+  if (lastHistoryId == null) return;
+  const btn = $('#btnFav'), on = !btn.classList.contains('on');
+  try {
+    const r = await fetch(`/api/history/${lastHistoryId}/favorite`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ favorite: on }) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
+    setFavButton(on); if (lastMeta) lastMeta.favorite = on;
+    log(on ? '⭐ Aggiunta alle preferite (archivio del tuo stile).' : 'Tolta dalle preferite.');
+    await Promise.all([loadHistory(), loadStyle()]);
+  } catch (e) { log('Preferita: ' + e.message); }
+};
+
+$('#styleProfile').oninput = () => { $('#btnStyleSave').disabled = false; };
+$('#btnStyleSave').onclick = async () => {
+  try {
+    const r = await fetch('/api/style-profile', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: $('#styleProfile').value }) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
+    $('#btnStyleSave').disabled = true;
+    log('Profilo di stile salvato.');
+    await loadStyle();
+  } catch (e) { log('Profilo non salvato: ' + e.message); }
+};
+
+$('#btnStyleBuild').onclick = async () => {
+  if (MODE !== 'proxy') return log('Il profilo di stile richiede il server locale.');
+  const imgs = styleState.archive.images;
+  if (imgs.length < 3) return log(`Profilo di stile: segna almeno 3 immagini (⭐ in cronologia o 🎨 tra gli allegati); ora sono ${imgs.length}.`);
+  if (!textModelSeesImages()) return log('Profilo di stile: il modello LLM scelto non vede le immagini. Scegline uno segnato con 👁.');
+  if (!$('#btnStyleSave').disabled && !confirm('Il profilo ha modifiche non salvate: aggiornarlo le sostituisce. Continuare?')) return;
+  const btn = $('#btnStyleBuild'); btn.disabled = true;
+  busy(true); log(`Analizzo ${imgs.length} immagini per il profilo di stile…`);
+  try {
+    const images = [], sources = [];
+    for (const i of imgs) {
+      try { images.push(await downscaleJpeg(i.url, 512)); sources.push(i.key); }
+      catch { log(`⚠ Immagine dell'archivio non leggibile (${i.kind}): saltata.`); }
+    }
+    if (images.length < 3) throw new Error('meno di 3 immagini leggibili');
+    const r = await orFetch('/api/style-profile/build', { model: $('#textModel').value, images, sources });
+    $('#btnStyleSave').disabled = true;
+    await loadStyle();
+    log(`🖌️ Profilo di stile aggiornato da ${images.length} immagini. Controllalo e, se serve, correggilo.`);
+    if (!r.text) log('⚠ Il profilo è vuoto.');
+  } catch (e) { log('Profilo di stile: ' + e.message); }
+  busy(false); btn.disabled = false;
 };
 
 /* ── Utility ── */
@@ -779,12 +906,14 @@ $('#btnHistClear').onclick = async () => {
 function showImage(url, meta){
   renderImage(url, meta);
   addToGallery(url, meta);
-  saveToHistory(url);
+  saveToHistory(url, meta);
 }
 
 /* Solo visualizzazione (usata anche da galleria e ripristino, senza salvare) */
 function renderImage(url, meta){
   lastImage = url; lastMeta = meta;
+  lastHistoryId = meta?.historyId ?? null;
+  setFavButton(meta?.favorite);
   const img = new Image(); img.alt = 'risultato'; img.src = url;   // niente HTML interpolato
   $('#stage').replaceChildren(img);
   watchStage(img);
@@ -818,7 +947,7 @@ function addToGallery(url, meta){
   $('#gallery').prepend(im);
 }
 
-async function saveToHistory(url){
+async function saveToHistory(url, meta){
   if (MODE !== 'proxy') return;
   try {
     const r = await fetch('/api/history', { method:'POST', headers:{'Content-Type':'application/json'},
@@ -828,7 +957,10 @@ async function saveToHistory(url){
         brief: $('#brief').value, prompt: $('#promptOut').value, image: url,
         text_model: $('#textModel').value, image_model: $('#imageModel').value
       })});
-    if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || r.status); }
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || r.status);
+    if (meta) meta.historyId = j.id;   // anche la galleria della sessione ritrova la riga
+    if (lastMeta === meta) { lastHistoryId = j.id; setFavButton(false); }
     await loadHistory();
   } catch(e){ log('Cronologia non salvata: ' + e.message); }
 }

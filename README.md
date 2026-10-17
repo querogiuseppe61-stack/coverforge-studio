@@ -61,6 +61,19 @@ Il modello che scrive il prompt tratta l'articolo come fonte principale: prima n
 
 La mascherina propone il preset *Immagine articolo* (titolo e categoria in basso a sinistra).
 
+## Il mio stile
+
+L'app può imparare il tuo gusto grafico e orientare i prompt di conseguenza.
+
+1. **Costruisci l'archivio.** Segna con ⭐ le immagini che ti piacciono, nella cronologia o con il pulsante *☆ Preferita* sotto il risultato. Tra le immagini allegate nei Riferimenti, segna con 🎨 quelle che rappresentano il tuo gusto, anche se non le hai fatte con CoverForge.
+2. **Aggiorna il profilo.** Con almeno 3 immagini nell'archivio, *↻ Aggiorna profilo* le manda, ridotte a 512 px, al modello LLM scelto, che deve avere la vista (👁). Il modello scrive una descrizione dello stile: tecnica, palette, luce, composizione, dettaglio, atmosfera, ricorrenze e ciò che manca. Si usano al massimo 16 immagini, alternando esempi 🎨 e preferite ⭐, le più recenti prima.
+3. **Correggilo se serve.** Il profilo è un testo modificabile; *💾 Salva modifiche* lo conserva.
+4. **Spunta «Usa il mio stile nei prompt».** Il profilo entra nelle istruzioni del modello che scrive il prompt.
+
+Il brief e lo *Stile artistico* scelto nel menu hanno la precedenza sul profilo. Per il Blog l'articolo decide l'atmosfera e il profilo il trattamento grafico; per logo e icona del profilo si usano solo palette e gusto generale.
+
+Le immagini dell'archivio vanno a OpenRouter solo quando aggiorni il profilo; a ogni prompt viaggia solo il testo, che costa pochissimo e funziona con qualunque modello. Se l'archivio cambia dopo l'ultimo aggiornamento, l'app lo segnala.
+
 ## Vettorializzazione (SVG)
 
 Il pulsante **⇪ SVG** traccia l'immagine in locale, senza inviarla a nessun servizio: riduce i colori (scelti nel menu accanto), traccia i contorni e produce un SVG a colori piatti. Dà il meglio con loghi e icone; con fotografie e sfumature il risultato è grande e poco fedele.
