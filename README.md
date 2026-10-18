@@ -1,10 +1,12 @@
 # CoverForge Studio
 
+**Italiano** · [English](README.en.md)
+
 Copertine di libri e dischi, loghi, icone, header e immagini per articoli di blog. Scrivi in italiano che cosa ti serve: un modello di testo fa da art director e scrive il prompt, un modello grafico crea l'immagine (tramite [OpenRouter](https://openrouter.ai)). Poi puoi modificarla, comporre il testo sopra ed esportarla.
 
-![CoverForge Studio: brief, prompt e copertina con il titolo composto dalla mascherina](docs/schermata.png)
+![Dimostrazione: un brief breve, il prompt scritto dall'art director, la copertina generata](docs/demo.gif)
 
-<sub>L'immagine nella schermata è un disegno d'esempio fatto per questa pagina, non un risultato generato.</sub>
+<sub>La dimostrazione usa un OpenRouter simulato e la copertina è un disegno d'esempio fatto per questa pagina, non un risultato generato.</sub>
 
 ## Perché provarla
 
@@ -14,6 +16,10 @@ Copertine di libri e dischi, loghi, icone, header e immagini per articoli di blo
 - **Modifica completa.** Ritocchi descritti a parole o su una zona segnata, cambio di formato senza tagli, confronto prima/dopo, versioni collegate.
 - **Nessun abbonamento.** Scegli qualunque modello di testo e d'immagine disponibile su OpenRouter e paghi solo quello che usi; il costo di ogni operazione è sempre visibile.
 - **Tutto in locale.** Cronologia, file e immagini stanno sul tuo computer; il server ascolta solo in locale, i font sono inclusi, la guida dei prompt è un file di testo che puoi leggere e modificare.
+
+![CoverForge Studio: brief, prompt e copertina con il titolo composto dalla mascherina](docs/schermata.png)
+
+<sub>Anche qui la copertina è un disegno d'esempio; il titolo è composto con la mascherina.</sub>
 
 ## Che cosa serve
 
